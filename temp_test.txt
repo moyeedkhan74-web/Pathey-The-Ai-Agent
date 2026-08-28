@@ -1,0 +1,12 @@
+﻿The property 'SpeechRecognized' cannot be found on this object. Verify that the property exists and can be set.
+This
+thing you
+see is
+six
+months
+since
+I've been in
+the artworks
+came from
+relief for
+the attack

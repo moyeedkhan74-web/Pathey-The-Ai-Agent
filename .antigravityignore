@@ -1,0 +1,8 @@
+node_modules
+node_modules_old
+dist
+temp_test.txt
+*.db
+*.db-journal
+*.db-wal
+temp_voice_capture.txt
