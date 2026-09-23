@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Pathey — cinematic boot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05070b; --cyan: #5ad7ff; --blue: #6f8bff; --purple: #b48bff; --green: #3dffa0;
+    --text: #dfe8ee; --text-dim: #7c8a94;
+    --glass-bg: rgba(255,255,255,0.035); --glass-border: rgba(160,210,255,0.14);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #000; color: var(--text); font-family: 'Sora', sans-serif; overflow: hidden; }
+  #app { position: relative; width: 100vw; height: 100vh; background: radial-gradient(ellipse at 50% 42%, #0b131c 0%, var(--bg) 70%); }
+  canvas#core, canvas#boot { position: absolute; top: 0; left: 0; }
+  canvas#boot { z-index: 50; background: #000; transition: opacity 0.9s ease; }
+  canvas#boot.fade-out { opacity: 0; pointer-events: none; }
+
+  #main-ui { opacity: 0; }
+  #main-ui.reveal { opacity: 1; transition: opacity 0.8s ease; }
+
+  .glass { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px; backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); padding: 18px 20px; }
+  .panel-title { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 14px; }
+  .panel-enter { opacity: 0; transform: translateY(10px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .panel-enter.in { opacity: 1; transform: translateY(0); }
+
+  /* Brand text sits above the boot canvas so the letter-reveal is visible during the sweep */
+  #boot-brand { position: absolute; top: 24px; left: 24px; z-index: 51; font-size: 13px; letter-spacing: 4px; color: var(--cyan); display: flex; }
+  #boot-brand .letter { opacity: 0; filter: blur(4px); transform: translateY(3px); text-shadow: 0 0 14px rgba(90,215,255,0.7); transition: opacity 0.35s ease, filter 0.35s ease, transform 0.35s ease; }
+  #boot-brand .letter.in { opacity: 1; filter: blur(0); transform: translateY(0); }
+  #boot-sub { position: absolute; top: 44px; left: 24px; z-index: 51; font-size: 10px; letter-spacing: 1.5px; color: var(--text-dim); opacity: 0; transition: opacity 0.8s ease; }
+  #boot-sub.in { opacity: 1; }
+
+  #brand { position: absolute; top: 24px; left: 24px; font-size: 13px; letter-spacing: 4px; color: var(--cyan); text-shadow: 0 0 10px rgba(90,215,255,0.5); }
+  #brand span { display: block; font-size: 10px; letter-spacing: 1.5px; color: var(--text-dim); margin-top: 4px; text-shadow: none; }
+
+  #memory-panel { position: absolute; top: 100px; left: 24px; width: 210px; }
+  #memory-panel ul { list-style: none; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+  #memory-panel li { padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 8px; }
+  #memory-panel li:last-child { border-bottom: none; }
+  #memory-panel .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 6px var(--cyan); flex-shrink: 0; }
+
+  #tasks-panel { position: absolute; top: 100px; right: 24px; width: 230px; }
+  #tasks-panel ul { list-style: none; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+  #tasks-panel li { padding: 6px 0; display: flex; align-items: center; gap: 8px; color: var(--text-dim); }
+  #tasks-panel li.done { color: var(--text); }
+  #tasks-panel .mark { width: 14px; text-align: center; color: var(--green); font-size: 12px; }
+  #tasks-panel .spin { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--cyan); border-top-color: transparent; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #dev-panel { position: absolute; top: 300px; right: 24px; width: 230px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+  #dev-panel .row { display: flex; justify-content: space-between; padding: 6px 0; color: var(--text-dim); border-bottom: 1px solid rgba(255,255,255,0.05); }
+  #dev-panel .row:last-child { border-bottom: none; }
+  #dev-panel .row span.v { color: var(--purple); }
+
+  #neural-panel { position: absolute; top: 100px; left: 260px; width: 200px; opacity: 0; pointer-events: none; transform: translateY(-6px); transition: all 0.4s ease; }
+  #neural-panel.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  #neural-panel .tree { font-family: 'IBM Plex Mono', monospace; font-size: 12px; line-height: 2; color: var(--text-dim); }
+  #neural-panel .tree .root { color: var(--cyan); }
+  #neural-panel .tree .leaf { color: var(--text); padding-left: 14px; }
+
+  #status-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, 128px); text-align: center; width: 300px; font-size: 15px; letter-spacing: 3px; color: var(--cyan); text-shadow: 0 0 10px rgba(90,215,255,0.4); text-transform: uppercase; }
+  #voice-bar { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); width: 320px; text-align: center; }
+  #voice-bar canvas { width: 100%; height: 40px; }
+  #voice-text { font-size: 11px; letter-spacing: 2px; color: var(--text-dim); margin-top: 6px; text-transform: uppercase; }
+  #state-switcher { position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+  #state-switcher button, #vision-btn { background: transparent; border: 1px solid var(--glass-border); color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; padding: 8px 14px; border-radius: 20px; cursor: pointer; transition: all 0.2s ease; }
+  #state-switcher button:hover, #vision-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  #state-switcher button.active { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 10px rgba(90,215,255,0.25); }
+  #vision-btn { position: absolute; top: 24px; right: 24px; }
+  #vision-overlay { position: absolute; inset: 0; background: rgba(2,4,8,0.88); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.35s ease; z-index: 20; }
+  #vision-overlay.show { opacity: 1; pointer-events: auto; }
+  #vision-frame { position: relative; width: 560px; height: 340px; border: 1px solid var(--glass-border); border-radius: 10px; background: rgba(255,255,255,0.02); overflow: hidden; }
+  #scan-line { position: absolute; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); box-shadow: 0 0 10px var(--cyan); animation: scan 2.4s linear infinite; }
+  @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+  .marker { position: absolute; display: flex; align-items: center; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--cyan); }
+  .marker .ring { width: 10px; height: 10px; border: 1.5px solid var(--cyan); border-radius: 50%; box-shadow: 0 0 8px var(--cyan); }
+  #m1 { top: 60px; left: 40px; } #m2 { top: 180px; right: 50px; } #m3 { bottom: 40px; left: 60px; }
+  #vision-close { position: absolute; top: -36px; right: 0; background: transparent; border: 1px solid var(--glass-border); color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1px; padding: 6px 12px; border-radius: 16px; cursor: pointer; }
+  #vision-caption { position: absolute; bottom: -30px; left: 0; font-size: 10px; letter-spacing: 1px; color: var(--text-dim); text-transform: uppercase; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <canvas id="boot"></canvas>
+  <div id="boot-brand"></div>
+  <div id="boot-sub">personal AI workspace</div>
+
+  <div id="main-ui">
+    <canvas id="core"></canvas>
+    <div id="brand">PATHEY<span>personal AI workspace</span></div>
+
+    <div id="memory-panel" class="glass panel-enter">
+      <div class="panel-title">Pathey memory</div>
+      <ul>
+        <li><span class="dot"></span>SilenX project</li>
+        <li><span class="dot"></span>Baqala project</li>
+        <li><span class="dot"></span>Coding preferences</li>
+        <li><span class="dot"></span>Recent tasks</li>
+        <li><span class="dot"></span>User workflow</li>
+      </ul>
+    </div>
+
+    <div id="neural-panel" class="glass">
+      <div class="panel-title">AI research</div>
+      <div class="tree">
+        <div class="root">Coding assistants</div>
+        <div class="leaf">├── Claude</div>
+        <div class="leaf">├── GPT</div>
+        <div class="leaf">├── Gemini</div>
+        <div class="leaf">└── Local models</div>
+      </div>
+    </div>
+
+    <div id="tasks-panel" class="glass panel-enter">
+      <div class="panel-title">Current tasks</div>
+      <ul>
+        <li class="done"><span class="mark">✓</span>Opening VS Code</li>
+        <li class="done"><span class="mark">✓</span>Checking GitHub</li>
+        <li><span class="spin"></span>Analyzing project</li>
+        <li class="done"><span class="mark">✓</span>Completed</li>
+      </ul>
+    </div>
+
+    <div id="dev-panel" class="glass panel-enter">
+      <div class="panel-title">Developer mode</div>
+      <div class="row">Code analysis<span class="v">2 issues</span></div>
+      <div class="row">Terminal<span class="v">git status</span></div>
+      <div class="row">Git<span class="v">3 changed</span></div>
+      <div class="row">Debug<span class="v">missing await</span></div>
+    </div>
+
+    <div id="status-label">idle</div>
+    <div id="voice-bar"><canvas id="wave"></canvas><div id="voice-text">How can I help?</div></div>
+
+    <div id="state-switcher">
+      <button data-state="idle" class="active">Idle</button>
+      <button data-state="listening">Listening</button>
+      <button data-state="thinking">Thinking</button>
+      <button data-state="completed">Completed</button>
+    </div>
+
+    <button id="vision-btn">Vision mode</button>
+    <div id="vision-overlay">
+      <div id="vision-frame">
+        <div id="scan-line"></div>
+        <div class="marker" id="m1"><span class="ring"></span>Error detected: line 42</div>
+        <div class="marker" id="m2"><span class="ring"></span>Submit button</div>
+        <div class="marker" id="m3"><span class="ring"></span>Unclosed tag</div>
+        <div id="vision-caption">Screen analysis · live</div>
+        <button id="vision-close">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= MAIN CORE CANVAS (idle/listening/thinking/completed) ================= */
+const canvas = document.getElementById('core'), ctx = canvas.getContext('2d');
+let W, H, CX, CY;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; CX = W/2; CY = H/2 - 10; }
+addEventListener('resize', resize); resize();
+
+const waveCanvas = document.getElementById('wave'), wctx = waveCanvas.getContext('2d');
+function resizeWave() { waveCanvas.width = waveCanvas.clientWidth * 2; waveCanvas.height = waveCanvas.clientHeight * 2; wctx.scale(2,2); }
+resizeWave();
+
+const statusLabel = document.getElementById('status-label');
+const voiceText = document.getElementById('voice-text');
+const neuralPanel = document.getElementById('neural-panel');
+const buttons = document.querySelectorAll('#state-switcher button');
+let state = 'idle', t = 0, completedPulse = 0;
+const stateCopy = { idle: 'How can I help?', listening: 'Listening…', thinking: 'Processing…', completed: 'Completed' };
+const stateColor = { idle: '#5ad7ff', listening: '#5ad7ff', thinking: '#b48bff', completed: '#3dffa0' };
+
+function setState(s) {
+  state = s;
+  statusLabel.textContent = s; statusLabel.style.color = stateColor[s];
+  voiceText.textContent = stateCopy[s];
+  buttons.forEach(b => b.classList.toggle('active', b.dataset.state === s));
+  neuralPanel.classList.toggle('show', s === 'thinking');
+  if (s === 'completed') { completedPulse = 1; setTimeout(() => { if (state === 'completed') setState('idle'); }, 2200); }
+}
+buttons.forEach(b => b.addEventListener('click', () => setState(b.dataset.state)));
+document.getElementById('vision-btn').addEventListener('click', () => document.getElementById('vision-overlay').classList.add('show'));
+document.getElementById('vision-close').addEventListener('click', () => document.getElementById('vision-overlay').classList.remove('show'));
+
+function drawCore() {
+  const baseR = 62, color = stateColor[state];
+  if (state === 'idle') {
+    const pulse = 1 + Math.sin(t * 0.03) * 0.06;
+    ctx.strokeStyle = color; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(CX, CY, baseR * pulse + 20, 0, Math.PI*2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, baseR * pulse);
+    grad.addColorStop(0, 'rgba(90,215,255,0.55)'); grad.addColorStop(0.6, 'rgba(90,215,255,0.15)'); grad.addColorStop(1, 'rgba(90,215,255,0)');
+    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(CX, CY, baseR * pulse, 0, Math.PI*2); ctx.fill();
+  }
+  if (state === 'listening') {
+    for (let i = 0; i < 3; i++) {
+      const phase = (t * 0.02 + i * 0.7) % 2, r = baseR + phase * 70;
+      ctx.strokeStyle = color; ctx.globalAlpha = Math.max(0, 0.5 - phase * 0.25); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(CX, CY, r, 0, Math.PI*2); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, baseR);
+    grad.addColorStop(0, 'rgba(90,215,255,0.6)'); grad.addColorStop(1, 'rgba(90,215,255,0)');
+    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(CX, CY, baseR, 0, Math.PI*2); ctx.fill();
+  }
+  if (state === 'thinking') {
+    ctx.save(); ctx.translate(CX, CY);
+    const nodes = 10, pts = [];
+    for (let i = 0; i < nodes; i++) {
+      const ang = (i/nodes) * Math.PI*2 + t*0.012, r = baseR + 20 + Math.sin(t*0.03 + i) * 12;
+      pts.push([Math.cos(ang)*r, Math.sin(ang)*r]);
+    }
+    ctx.strokeStyle = '#b48bff'; ctx.globalAlpha = 0.35; ctx.lineWidth = 0.7;
+    for (let i = 0; i < nodes; i++) for (let j = i+1; j < nodes; j++) if ((i+j) % 3 === 0) { ctx.beginPath(); ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[j][0], pts[j][1]); ctx.stroke(); }
+    ctx.globalAlpha = 0.9; ctx.fillStyle = '#d8c4ff';
+    pts.forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 2, 0, Math.PI*2); ctx.fill(); });
+    ctx.restore();
+    const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, baseR);
+    grad.addColorStop(0, 'rgba(180,139,255,0.5)'); grad.addColorStop(1, 'rgba(180,139,255,0)');
+    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(CX, CY, baseR, 0, Math.PI*2); ctx.fill();
+  }
+  if (state === 'completed') {
+    if (completedPulse > 0) {
+      const r = baseR + (1 - completedPulse) * 100;
+      ctx.strokeStyle = '#3dffa0'; ctx.globalAlpha = completedPulse; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(CX, CY, r, 0, Math.PI*2); ctx.stroke();
+      ctx.globalAlpha = 1; completedPulse -= 0.012; if (completedPulse < 0) completedPulse = 0;
+    }
+    const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, baseR);
+    grad.addColorStop(0, 'rgba(61,255,160,0.55)'); grad.addColorStop(1, 'rgba(61,255,160,0)');
+    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(CX, CY, baseR, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.fillStyle = '#f2fbff'; ctx.beginPath(); ctx.arc(CX, CY, 4, 0, Math.PI*2); ctx.fill();
+}
+function drawWave() {
+  const w = waveCanvas.clientWidth, h = waveCanvas.clientHeight;
+  wctx.clearRect(0, 0, w, h);
+  const bars = 28, gap = 4, bw = (w - gap*(bars-1)) / bars;
+  for (let i = 0; i < bars; i++) {
+    let n;
+    if (state === 'listening') n = Math.abs(Math.sin(t*0.09 + i*0.5)) * 0.8 + 0.1;
+    else if (state === 'thinking') n = Math.abs(Math.sin(t*0.15 + i)) * 0.5 + 0.15;
+    else n = 0.08 + Math.sin(t*0.03 + i*0.3) * 0.03;
+    const bh = n * h;
+    wctx.fillStyle = stateColor[state]; wctx.globalAlpha = 0.35 + n * 0.5;
+    wctx.fillRect(i*(bw+gap), (h-bh)/2, bw, bh);
+  }
+  wctx.globalAlpha = 1;
+}
+function mainLoop() { ctx.clearRect(0, 0, W, H); t++; drawCore(); drawWave(); requestAnimationFrame(mainLoop); }
+setState('idle');
+mainLoop();
+
+/* ================= CINEMATIC BOOT SEQUENCE ================= */
+const bootCanvas = document.getElementById('boot'), bctx = bootCanvas.getContext('2d');
+function resizeBoot() { bootCanvas.width = innerWidth; bootCanvas.height = innerHeight; }
+addEventListener('resize', resizeBoot); resizeBoot();
+const bCX = () => innerWidth / 2, bCY = () => innerHeight / 2 - 10;
+
+// Three rings: independent phase-in time, base rotation speed/direction, radius
+const rings = [
+  { delay: 900,  speed: 0.0009,  dir: 1,  radius: 78,  segs: 40, in: 0 },
+  { delay: 1400, speed: 0.0006,  dir: -1, radius: 108, segs: 28, in: 0 },
+  { delay: 1850, speed: 0.0012,  dir: 1,  radius: 138, segs: 60, in: 0 }
+];
+let flashed = false;       // has the big activation flash fired
+let waveR = 0, waveAlpha = 0;   // the big energy wave that fires at the flash
+let finalWaveR = 0, finalWaveAlpha = 0; // the closing waveform ring
+let particles = [];
+for (let i = 0; i < 26; i++) {
+  particles.push({
+    angle: Math.random() * Math.PI * 2,
+    radius: 90 + Math.random() * 55,
+    speed: (0.0003 + Math.random() * 0.0006) * (Math.random() < 0.5 ? 1 : -1),
+    size: Math.random() * 1.2 + 0.4,
+    phaseIn: 1400 + Math.random() * 1200
+  });
+}
+let hudArcs = [];
+for (let i = 0; i < 5; i++) {
+  hudArcs.push({
+    angle: Math.random() * Math.PI * 2,
+    radius: 95 + Math.random() * 50,
+    length: 0.4 + Math.random() * 0.6,
+    start: 1900 + Math.random() * 1200,
+    life: 220 + Math.random() * 180
+  });
+}
+
+/* ================= SFX ENGINE v3 — ring mod, bitcrush, delay bus, data-burst ================= */
+let actx, delayNode, delayFeedback, delayWet, distCurve;
+function ensureAudio() {
+  if (!actx) {
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    delayNode = actx.createDelay(); delayNode.delayTime.value = 0.085;
+    delayFeedback = actx.createGain(); delayFeedback.gain.value = 0.24;
+    delayWet = actx.createGain(); delayWet.gain.value = 0.16;
+    delayNode.connect(delayFeedback); delayFeedback.connect(delayNode);
+    delayNode.connect(delayWet); delayWet.connect(actx.destination);
+    const n = 4096, curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const x = (i / n) * 2 - 1; curve[i] = Math.tanh(x * 3.2); }
+    distCurve = curve;
+  }
+  if (actx.state === 'suspended') actx.resume();
+}
+function sendToDelay(node) { node.connect(delayNode); }
+
+function sfxRingMod(carrierFreq, modFreq, dur, vol, panPos) {
+  ensureAudio();
+  const t0 = actx.currentTime;
+  const car = actx.createOscillator(), mod = actx.createOscillator();
+  const carGain = actx.createGain(), modDepth = actx.createGain();
+  const envGain = actx.createGain(), pan = actx.createStereoPanner();
+  car.type = 'square'; car.frequency.setValueAtTime(carrierFreq, t0);
+  mod.type = 'sine'; mod.frequency.setValueAtTime(modFreq, t0);
+  modDepth.gain.value = 0.9;
+  carGain.gain.value = 0;
+  mod.connect(modDepth); modDepth.connect(carGain.gain);
+  envGain.gain.setValueAtTime(0, t0);
+  envGain.gain.linearRampToValueAtTime(vol, t0 + 0.006);
+  envGain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  pan.pan.value = panPos || 0;
+  car.connect(carGain); carGain.connect(envGain); envGain.connect(pan);
+  pan.connect(actx.destination); sendToDelay(pan);
+  car.start(t0); mod.start(t0); car.stop(t0 + dur + 0.05); mod.stop(t0 + dur + 0.05);
+}
+function sfxDistortedHit(freq, dur, vol) {
+  ensureAudio();
+  const t0 = actx.currentTime;
+  const osc = actx.createOscillator(), shaper = actx.createWaveShaper(), gain = actx.createGain();
+  osc.type = 'sawtooth'; osc.frequency.setValueAtTime(freq, t0);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(20, freq * 0.3), t0 + dur);
+  shaper.curve = distCurve; shaper.oversample = '2x';
+  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(shaper); shaper.connect(gain); gain.connect(actx.destination);
+  osc.start(t0); osc.stop(t0 + dur + 0.05);
+}
+function sfxResoSweep(f0, f1, dur, vol, q) {
+  ensureAudio();
+  const t0 = actx.currentTime;
+  const osc = actx.createOscillator(), filt = actx.createBiquadFilter(), gain = actx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(f0, t0);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t0 + dur);
+  filt.type = 'bandpass'; filt.Q.value = q || 8;
+  filt.frequency.setValueAtTime(f0, t0);
+  filt.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t0 + dur);
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(vol, t0 + dur * 0.25);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(filt); filt.connect(gain); gain.connect(actx.destination);
+  osc.start(t0); osc.stop(t0 + dur + 0.05);
+}
+function sfxNoiseBurst(dur, vol, freq) {
+  ensureAudio();
+  const t0 = actx.currentTime;
+  const size = Math.max(1, Math.floor(actx.sampleRate * dur));
+  const buffer = actx.createBuffer(1, size, actx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < size; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / size);
+  const src = actx.createBufferSource(); src.buffer = buffer;
+  const filter = actx.createBiquadFilter(); filter.type = 'bandpass'; filter.Q.value = 6;
+  filter.frequency.value = freq || 3200;
+  const gain = actx.createGain();
+  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(filter); filter.connect(gain); gain.connect(actx.destination);
+  src.start(t0);
+}
+function sfxGlitchStutter(baseFreq, count, vol) {
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => sfxRingMod(baseFreq * (0.85 + Math.random() * 0.4), 40 + Math.random() * 60, 0.04, vol, (Math.random() - 0.5) * 0.6), i * 26);
+  }
+}
+function sfxSubThump(dur, vol) {
+  ensureAudio();
+  const t0 = actx.currentTime;
+  const osc = actx.createOscillator(), gain = actx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(150, t0);
+  osc.frequency.exponentialRampToValueAtTime(35, t0 + dur);
+  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain); gain.connect(actx.destination);
+  osc.start(t0); osc.stop(t0 + dur + 0.05);
+}
+function sfxPowerChord(freqs, dur, vol) {
+  ensureAudio();
+  const t0 = actx.currentTime;
+  freqs.forEach(f => {
+    [-4, 4].forEach(detune => {
+      const osc = actx.createOscillator(), filt = actx.createBiquadFilter(), gain = actx.createGain();
+      osc.type = 'sawtooth'; osc.frequency.setValueAtTime(f, t0); osc.detune.setValueAtTime(detune, t0);
+      filt.type = 'lowpass'; filt.frequency.setValueAtTime(400, t0);
+      filt.frequency.linearRampToValueAtTime(2600, t0 + dur * 0.6);
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(vol / freqs.length / 2, t0 + dur * 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(filt); filt.connect(gain); gain.connect(actx.destination);
+      osc.start(t0); osc.stop(t0 + dur + 0.1);
+    });
+  });
+  setTimeout(() => sfxRingMod(freqs[freqs.length - 1] * 2, 7, dur * 0.7, vol * 0.15, 0), 60);
+}
+function sfxStaticSwell(dur, vol) {
+  ensureAudio();
+  const t0 = actx.currentTime;
+  const size = Math.max(1, Math.floor(actx.sampleRate * dur));
+  const buffer = actx.createBuffer(1, size, actx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+  const src = actx.createBufferSource(); src.buffer = buffer;
+  const filt = actx.createBiquadFilter(); filt.type = 'bandpass'; filt.Q.value = 3;
+  filt.frequency.setValueAtTime(400, t0);
+  filt.frequency.exponentialRampToValueAtTime(2200, t0 + dur);
+  const pan = actx.createStereoPanner(), lfo = actx.createOscillator(), lfoGain = actx.createGain();
+  lfo.frequency.value = 0.6; lfoGain.gain.value = 0.5;
+  lfo.connect(lfoGain); lfoGain.connect(pan.pan);
+  const gain = actx.createGain();
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(vol, t0 + dur * 0.4);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(filt); filt.connect(gain); gain.connect(pan); pan.connect(actx.destination);
+  src.start(t0); lfo.start(t0); lfo.stop(t0 + dur + 0.1);
+}
+function sfxChargeBurst(startFreq, endFreq, steps, totalDur, vol) {
+  for (let i = 0; i < steps; i++) {
+    const f = startFreq * Math.pow(endFreq / startFreq, i / (steps - 1));
+    setTimeout(() => sfxRingMod(f, 30, 0.045, vol, (i / steps - 0.5) * 0.5), (i / steps) * totalDur * 1000);
+  }
+}
+function sfxScanTick(vol, pan) {
+  ensureAudio();
+  const t0 = actx.currentTime;
+  const osc = actx.createOscillator(), gain = actx.createGain(), panner = actx.createStereoPanner();
+  osc.type = 'sine'; osc.frequency.setValueAtTime(2400, t0);
+  osc.frequency.exponentialRampToValueAtTime(1400, t0 + 0.06);
+  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07);
+  panner.pan.value = pan;
+  osc.connect(gain); gain.connect(panner); panner.connect(actx.destination); sendToDelay(panner);
+  osc.start(t0); osc.stop(t0 + 0.1);
+}
+
+const soundHint = document.createElement('div');
+soundHint.textContent = 'click anywhere for sound';
+soundHint.style.cssText = 'position:fixed;bottom:14px;right:18px;z-index:200;font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:1.5px;color:#7c8a94;opacity:0.8;text-transform:uppercase;pointer-events:none;';
+document.body.appendChild(soundHint);
+function unlockAudio() { ensureAudio(); soundHint.remove(); document.removeEventListener('click', unlockAudio); document.removeEventListener('keydown', unlockAudio); }
+document.addEventListener('click', unlockAudio);
+document.addEventListener('keydown', unlockAudio);
+
+const bootBrandEl = document.getElementById('boot-brand');
+const bootSubEl = document.getElementById('boot-sub');
+"PATHEY".split('').forEach(ch => {
+  const span = document.createElement('span');
+  span.className = 'letter'; span.textContent = ch;
+  bootBrandEl.appendChild(span);
+});
+const letterEls = bootBrandEl.querySelectorAll('.letter');
+
+function speakLine(text) {
+  // Preview-only browser voice — swap for your real voice.js/Piper speak() call
+  // at the two marked trigger points below inside the real Electron app.
+  if (!window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance(text);
+  window.speechSynthesis.speak(u);
+}
+
+const bootStart = performance.now();
+let lightSweepStarted = false, subShown = false, introSpoken = false;
+
+function drawBoot(now) {
+  const el = now - bootStart; // elapsed ms since boot start
+  bctx.clearRect(0, 0, innerWidth, innerHeight);
+  const cx = bCX(), cy = bCY();
+
+  // ---- Phase 1 (0–1.2s): the point brightens, one soft pulse expands ----
+  const pointAlpha = Math.min(1, Math.max(0, (el - 150) / 500));
+  if (pointAlpha > 0) {
+    bctx.globalAlpha = pointAlpha;
+    bctx.fillStyle = '#f4fbff';
+    bctx.beginPath(); bctx.arc(cx, cy, 2.4, 0, Math.PI*2); bctx.fill();
+    bctx.globalAlpha = 1;
+  }
+  if (el > 150 && !window.__sparkSounded) { window.__sparkSounded = true; sfxRingMod(1800, 60, 0.25, 0.05, 0); }
+  if (el > 500 && el < 1300) {
+    if (!window.__pulseSounded) { window.__pulseSounded = true; sfxResoSweep(300, 900, 0.5, 0.045, 6); }
+    const p = (el - 500) / 800;
+    bctx.strokeStyle = '#5ad7ff'; bctx.globalAlpha = (1 - p) * 0.5; bctx.lineWidth = 1;
+    bctx.beginPath(); bctx.arc(cx, cy, p * 60, 0, Math.PI*2); bctx.stroke();
+    bctx.globalAlpha = 1;
+  }
+
+  // ---- Phase 2: three thin rings appear + rotate, opposite/varied directions ----
+  rings.forEach((ring, ringIdx) => {
+    if (el < ring.delay) return;
+    if (!ring.sounded) { ring.sounded = true; sfxRingMod(340 + ringIdx * 110, 60 + ringIdx * 40, 0.32, 0.045, (ringIdx - 1) * 0.3); }
+    ring.in = Math.min(1, (el - ring.delay) / 500);
+    const rot = ring.rotationAngle = (ring.rotationAngle || 0) + ring.speed * ring.dir * 16;
+    const gap = 0.06;
+    bctx.strokeStyle = '#5ad7ff';
+    bctx.globalAlpha = ring.in * 0.4;
+    bctx.lineWidth = 1;
+    const arcLen = (Math.PI * 2) / ring.segs;
+    for (let i = 0; i < ring.segs; i++) {
+      const s = i * arcLen + rot, e = s + arcLen - gap;
+      bctx.beginPath(); bctx.arc(cx, cy, ring.radius, s, e); bctx.stroke();
+    }
+  });
+
+  // ---- Phase 3: orbiting particles fade in ----
+  if (el > 1400 && !window.__particlesSounded) { window.__particlesSounded = true; sfxStaticSwell(0.9, 0.05); }
+  particles.forEach(p => {
+    if (el < p.phaseIn) return;
+    const a = Math.min(1, (el - p.phaseIn) / 700);
+    p.angle += p.speed * 16;
+    const x = cx + Math.cos(p.angle) * p.radius, y = cy + Math.sin(p.angle) * p.radius * 0.94;
+    bctx.globalAlpha = a * 0.55;
+    bctx.fillStyle = '#8fe0ff';
+    bctx.beginPath(); bctx.arc(x, y, p.size, 0, Math.PI*2); bctx.fill();
+  });
+  bctx.globalAlpha = 1;
+
+  // ---- Phase 4: brief HUD arcs flicker in/out ----
+  hudArcs.forEach(arc => {
+    const localT = el - arc.start;
+    if (localT < 0 || localT > arc.life) return;
+    if (!arc.sounded) { arc.sounded = true; sfxGlitchStutter(2200 + Math.random() * 900, 2, 0.045); }
+    const envelope = Math.sin((localT / arc.life) * Math.PI); // fade in then out
+    bctx.strokeStyle = '#5ad7ff'; bctx.globalAlpha = envelope * 0.45; bctx.lineWidth = 1;
+    bctx.beginPath();
+    bctx.arc(cx, cy, arc.radius, arc.angle, arc.angle + arc.length);
+    bctx.stroke();
+  });
+  bctx.globalAlpha = 1;
+
+  // ---- Phase 5: subtle scan line traveling across the core ----
+  if (el > 900 && el < 3500) {
+    const cyclePos = ((el - 900) % 1400) / 1400;
+    const y = cy - 70 + cyclePos * 140;
+    const grad = bctx.createLinearGradient(cx - 90, y, cx + 90, y);
+    grad.addColorStop(0, 'rgba(90,215,255,0)');
+    grad.addColorStop(0.5, 'rgba(90,215,255,0.35)');
+    grad.addColorStop(1, 'rgba(90,215,255,0)');
+    bctx.strokeStyle = grad; bctx.lineWidth = 1;
+    bctx.beginPath(); bctx.moveTo(cx - 90, y); bctx.lineTo(cx + 90, y); bctx.stroke();
+  }
+
+  // ---- Phase 6 (~3.5s): activation flash — core brightens hard, big wave fires ----
+  if (el > 3150 && !window.__chargeSounded) { window.__chargeSounded = true; sfxChargeBurst(600, 2400, 9, 0.32, 0.032); }
+  if (el > 3500 && !flashed) {
+    flashed = true;
+    waveR = 0; waveAlpha = 0.6;
+    rings.forEach(r => { r.rotationAngle = 0; r.dir = r.dir * -1; }); // synchronize, then reverse
+    sfxSubThump(0.35, 0.11);
+    sfxNoiseBurst(0.12, 0.08, 3800);
+    sfxResoSweep(220, 55, 0.4, 0.06, 10);
+    sfxRingMod(880, 65, 0.5, 0.045, 0);
+    speakLine('Systems online.'); // <-- real app: trigger voice.js speak() here instead
+  }
+  const flashAge = el - 3500;
+  if (flashAge > 0 && flashAge < 260) {
+    const fa = 1 - flashAge / 260;
+    const grad = bctx.createRadialGradient(cx, cy, 0, cx, cy, 90);
+    grad.addColorStop(0, `rgba(244,251,255,${fa * 0.9})`);
+    grad.addColorStop(1, 'rgba(244,251,255,0)');
+    bctx.fillStyle = grad; bctx.beginPath(); bctx.arc(cx, cy, 90, 0, Math.PI*2); bctx.fill();
+  }
+  if (waveAlpha > 0) {
+    waveR += 9; waveAlpha -= 0.012;
+    bctx.strokeStyle = '#5ad7ff'; bctx.globalAlpha = Math.max(0, waveAlpha); bctx.lineWidth = 1.4;
+    bctx.beginPath(); bctx.arc(cx, cy, waveR, 0, Math.PI*2); bctx.stroke();
+    bctx.globalAlpha = 1;
+  }
+
+  // core body itself, always drawn on top, brightens slightly through the sequence
+  const coreR = 30 + Math.min(1, el / 2000) * 8;
+  const coreGrad = bctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+  const coreBright = flashAge > 0 && flashAge < 260 ? 0.9 : 0.55;
+  coreGrad.addColorStop(0, `rgba(90,215,255,${coreBright})`);
+  coreGrad.addColorStop(1, 'rgba(90,215,255,0)');
+  bctx.fillStyle = coreGrad; bctx.beginPath(); bctx.arc(cx, cy, coreR, 0, Math.PI*2); bctx.fill();
+
+  // ---- Phase 7 (~3.7s+): cyan light sweeps toward upper-left, brand letters reveal ----
+  if (el > 3700 && el < 5000) {
+    const sweepP = Math.min(1, (el - 3700) / 1000);
+    const sx = cx + (100 - cx) * sweepP, sy = cy + (50 - cy) * sweepP;
+    const grad = bctx.createRadialGradient(sx, sy, 0, sx, sy, 70);
+    grad.addColorStop(0, `rgba(90,215,255,${0.35 * (1 - sweepP * 0.6)})`);
+    grad.addColorStop(1, 'rgba(90,215,255,0)');
+    bctx.fillStyle = grad; bctx.beginPath(); bctx.arc(sx, sy, 70, 0, Math.PI*2); bctx.fill();
+  }
+  // letters are revealed via the dedicated revealLetters() function on its own timer,
+  // triggered separately below — nothing needed here in the draw loop.
+
+  // ---- Phase 8 (~5.0–5.6s): final elegant pulse + expanding waveform, then settle ----
+  if (el > 5000 && finalWaveAlpha === 0 && finalWaveR === 0) {
+    finalWaveAlpha = 0.5;
+    sfxPowerChord([261.63, 392.00, 523.25], 1.4, 0.06); // C4-G4-C5, filtered detuned saws, resolving but processed
+    speakLine("Hey, I'm Pathey — your personal AI. I remember your projects, I can help you code, search, and get things done. Just say the word.");
+    // ^ real app: trigger voice.js speak() here for the self-introduction instead
+  }
+  if (finalWaveAlpha > 0) {
+    finalWaveR += 3.5; finalWaveAlpha -= 0.006;
+    bctx.strokeStyle = '#f4fbff'; bctx.globalAlpha = Math.max(0, finalWaveAlpha) * 0.7; bctx.lineWidth = 1;
+    bctx.beginPath(); bctx.arc(cx, cy, finalWaveR, 0, Math.PI*2); bctx.stroke();
+    bctx.globalAlpha = 1;
+  }
+
+  if (el < 6500) {
+    requestAnimationFrame(drawBoot);
+  } else {
+    settleIntoIdle();
+  }
+}
+requestAnimationFrame(drawBoot);
+
+// letter reveal — fires once per letter, staggered, starting when the light sweep arrives
+let lettersRevealed = false;
+function revealLetters() {
+  if (lettersRevealed) return;
+  lettersRevealed = true;
+  letterEls.forEach((span, i) => setTimeout(() => {
+    span.classList.add('in');
+    sfxRingMod(1300 + i * 70, 50, 0.1, 0.03, (i / 6 - 0.5) * 0.7);
+  }, i * 90));
+  setTimeout(() => { bootSubEl.classList.add('in'); sfxRingMod(1600, 45, 0.4, 0.03, 0); }, 700);
+}
+setTimeout(revealLetters, 4200);
+
+function settleIntoIdle() {
+  const bootCanvasEl = document.getElementById('boot');
+  bootCanvasEl.classList.add('fade-out');
+  document.getElementById('main-ui').classList.add('reveal');
+  document.querySelectorAll('.panel-enter').forEach((el, i) => setTimeout(() => el.classList.add('in'), i * 140));
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+.env
+/data
+node_modules
+dist
+vosk-model/
+*.mp3
+*.wav
+test_*
+out*.mp3
+/temp
+/tmp
+*.log
+log_*.txt
+install_*.txt
+npm_out.txt
