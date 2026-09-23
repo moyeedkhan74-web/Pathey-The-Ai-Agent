@@ -47,6 +47,7 @@ let _wsReady = false;
 let _wsConnecting = false;
 let _wsQueue = {};  // requestId -> { chunks: Buffer[], resolve, reject }
 let _wsReconnectTimer = null;
+let _wsRetryCount = 0;
 
 function _nowMs() { return Date.now(); }
 
@@ -125,7 +126,6 @@ function connectWS() {
   });
 
   ws.on('close', (code) => {
-    console.warn('[Pathey Voice] WebSocket closed:', code);
     _ws = null;
     _wsReady = false;
     _wsConnecting = false;
@@ -134,12 +134,15 @@ function connectWS() {
       try { entry.reject(new Error('WebSocket closed')); } catch (_) {}
     });
     _wsQueue = {};
-    // Auto-reconnect after 2s
-    if (!_wsReconnectTimer) {
+    // Auto-reconnect up to 3 times
+    _wsRetryCount = (_wsRetryCount || 0) + 1;
+    if (_wsRetryCount <= 3 && !_wsReconnectTimer) {
       _wsReconnectTimer = setTimeout(() => {
         _wsReconnectTimer = null;
         connectWS();
-      }, 2000);
+      }, 5000);
+    } else if (_wsRetryCount > 3) {
+      console.warn('[Pathey Voice] Edge TTS unavailable (403/Forbidden). Fallback to PowerShell speech synthesizer.');
     }
   });
 

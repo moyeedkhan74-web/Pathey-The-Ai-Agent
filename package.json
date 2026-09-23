@@ -5,8 +5,8 @@
   "main": "main.js",
   "scripts": {
     "postinstall": "node scripts/ensure-electron.js && node scripts/ensure-sqlite3.js",
-    "start": "electron .",
-    "electron": "electron .",
+    "start": "node_modules\\electron\\dist\\electron.exe .",
+    "electron": "node_modules\\electron\\dist\\electron.exe .",
     "dist": "electron-builder",
     "build": "electron-builder"
   },

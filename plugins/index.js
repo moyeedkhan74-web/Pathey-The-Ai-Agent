@@ -32,7 +32,7 @@ function loadPlugins(pluginsDir = path.join(__dirname, '..', 'plugins')) {
     fs.mkdirSync(pluginsDir, { recursive: true });
     return loaded;
   }
-  const files = fs.readdirSync(pluginsDir).filter(f => f.endsWith('.js') && !f.startsWith('.'));
+  const files = fs.readdirSync(pluginsDir).filter(f => f.endsWith('.js') && !f.startsWith('.') && f !== 'index.js');
   for (const file of files) {
     const filePath = path.join(pluginsDir, file);
     try {
