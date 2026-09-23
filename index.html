@@ -2393,38 +2393,48 @@ resetBtn.addEventListener('click', async () => {
 // â”€â”€ Confirmation Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const confirmModal = document.getElementById('confirm-modal');
 const confirmMessage = document.getElementById('confirm-message');
-const confirmAllowBtn = document.getElementById('confirm-allow');
-const confirmDenyBtn = document.getElementById('confirm-deny');
 let confirmResolve = null;
 
 function showConfirmModal(message) {
   return new Promise((resolve) => {
     confirmResolve = resolve;
-    confirmMessage.textContent = message;
-    confirmModal.classList.add('show');
+    const modal = document.getElementById('confirm-modal') || confirmModal;
+    const msg = document.getElementById('confirm-message') || confirmMessage;
+    if (msg) msg.textContent = message;
+    if (modal) modal.classList.add('show');
   });
 }
 
 function hideConfirmModal() {
-  confirmModal.classList.remove('show');
+  const modal = document.getElementById('confirm-modal') || confirmModal;
+  if (modal) modal.classList.remove('show');
   confirmResolve = null;
 }
 
-confirmAllowBtn.addEventListener('click', () => {
-  if (confirmResolve) confirmResolve(true);
-  hideConfirmModal();
+document.addEventListener('DOMContentLoaded', () => {
+  const allowBtn = document.getElementById('confirm-allow');
+  const denyBtn = document.getElementById('confirm-deny');
+  if (allowBtn) {
+    allowBtn.addEventListener('click', () => {
+      if (confirmResolve) confirmResolve(true);
+      hideConfirmModal();
+    });
+  }
+  if (denyBtn) {
+    denyBtn.addEventListener('click', () => {
+      if (confirmResolve) confirmResolve(false);
+      hideConfirmModal();
+    });
+  }
 });
 
-confirmDenyBtn.addEventListener('click', () => {
-  if (confirmResolve) confirmResolve(false);
-  hideConfirmModal();
-});
-
-window.api.confirmAction = async (message) => {
-  const confirmed = await showConfirmModal(message);
-  hideConfirmModal();
-  return confirmed;
-};
+if (window.api) {
+  window.api.confirmAction = async (message) => {
+    const confirmed = await showConfirmModal(message);
+    hideConfirmModal();
+    return confirmed;
+  };
+}
 
 // â”€â”€ Panel Collapse / Hide / Re-show Controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PANELS = [
