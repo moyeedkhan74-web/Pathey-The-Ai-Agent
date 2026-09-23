@@ -32,7 +32,7 @@ function isPathAllowed(targetPath) {
 }
 
 function requiresConfirmation(toolName) {
-  const DANGEROUS = new Set(['run_command', 'write_file', 'open_app', 'open_url']);
+  const DANGEROUS = new Set(['run_command', 'write_file']);
   return DANGEROUS.has(toolName);
 }
 

@@ -91,26 +91,8 @@ function findWindowsApp(name) {
 async function openUrl(args = {}) {
   let url = normalizeUrl(args.url || args.link || '');
   if (!url) return 'No URL provided.';
+  // If URL is valid, prepare to open directly in browser
   const isYouTube = isYouTubeWatchUrl(url) || isGenericYouTubeUrl(url);
-  const isDirectPortal = /chatgpt\.com|claude\.ai|gemini\.google\.com|mail\.google\.com|outlook\.live\.com/i.test(url);
-  if (!isYouTube && !isDirectPortal && !args.forceBrowser) {
-    const KNOWN_SEARCH_ENGINES = /(?:google\.com\/search|bing\.com\/search|duckduckgo\.com|search\.yahoo\.com|search\.brave\.com|search\.aol\.com|ask\.com|startpage\.com|ecosia\.org\/search|yandex\.com\/search)/i;
-    const SEARCH_PARAM_RE = /[?&](?:q|query|p|text)=([^&#]+)/i;
-    const SEARCH_PATH_RE = /\/(?:search|results)\b/i;
-    const isKnownEngine = KNOWN_SEARCH_ENGINES.test(url);
-    const hasSearchParam = SEARCH_PARAM_RE.test(url);
-    const hasSearchPath = SEARCH_PATH_RE.test(url);
-    if (isKnownEngine || hasSearchParam || hasSearchPath) {
-      const queryMatch = url.match(SEARCH_PARAM_RE);
-      const query = queryMatch ? decodeURIComponent(queryMatch[1]) : (args.searchQuery || 'general search');
-      logActivity('open_url_redirected_to_research', { originalUrl: url, query });
-      const { runResearch } = require('../main');
-      if (typeof runResearch === 'function') {
-        return await runResearch(query);
-      }
-      return { research: true, error: true };
-    }
-  }
   if (isYouTubeWatchUrl(url)) {
     const playable = await isYouTubeWatchUrlPlayable(url);
     if (!playable) {
