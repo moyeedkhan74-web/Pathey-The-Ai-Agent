@@ -1,0 +1,128 @@
+/* assets/css/plugins.css - Plugins Panel & Risk Badges */
+
+#plugins-panel {
+  position: absolute;
+  top: 80px;
+  left: 260px;
+  width: 310px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  z-index: 8;
+  display: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90,215,255,0.15) transparent;
+}
+
+#plugins-panel.visible {
+  display: block;
+}
+
+.plugin-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  backdrop-filter: blur(14px);
+  transition: all 0.25s ease;
+}
+
+.plugin-card:hover {
+  border-color: var(--glass-border-hover);
+}
+
+.plugin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.plugin-name {
+  font-family: 'Sora', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cyan);
+}
+
+.plugin-toggle {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.plugin-toggle.active {
+  background: var(--cyan);
+}
+
+.plugin-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.plugin-toggle.active::after {
+  transform: translateX(14px);
+}
+
+.plugin-desc {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+
+.plugin-tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plugin-tool-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px;
+}
+
+/* Risk Badges */
+.risk-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.risk-badge.safe {
+  background: rgba(61, 255, 160, 0.15);
+  color: #3dffa0;
+  border: 1px solid rgba(61, 255, 160, 0.3);
+}
+
+.risk-badge.moderate {
+  background: rgba(255, 183, 77, 0.15);
+  color: #ffb74d;
+  border: 1px solid rgba(255, 183, 77, 0.3);
+}
+
+.risk-badge.dangerous {
+  background: rgba(255, 90, 106, 0.15);
+  color: #ff5a6a;
+  border: 1px solid rgba(255, 90, 106, 0.3);
+}

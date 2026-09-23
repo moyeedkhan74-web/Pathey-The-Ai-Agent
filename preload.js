@@ -45,6 +45,12 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.removeAllListeners('confirm-action-result');
     ipcRenderer.on('confirm-action-result', (_event, confirmed) => callback(confirmed));
   },
+  getProvidersStatus: () => ipcRenderer.invoke('get-providers-status'),
+  setActiveProvider: (provider) => ipcRenderer.invoke('set-active-provider', provider),
+  getPluginsList: () => ipcRenderer.invoke('get-plugins-list'),
+  togglePlugin: (pluginId) => ipcRenderer.invoke('toggle-plugin', pluginId),
+  searchRagMemory: (query, limit) => ipcRenderer.invoke('search-rag-memory', { query, limit }),
+  getAuditLog: (limit) => ipcRenderer.invoke('get-audit-log', { limit }),
   onTtsAudioEnded: (callback) => {
     ttsAudioEndedCallbacks.push(callback);
     return () => {
@@ -55,6 +61,23 @@ contextBridge.exposeInMainWorld('api', {
   whisperStatus: () => ipcRenderer.invoke('whisper-status'),
   startWhisper: () => ipcRenderer.invoke('start-whisper'),
   stopWhisper: () => ipcRenderer.invoke('stop-whisper')
+});
+
+contextBridge.exposeInMainWorld('pathey', {
+  providers: {
+    getStatus: () => ipcRenderer.invoke('get-providers-status'),
+    setActive: (provider) => ipcRenderer.invoke('set-active-provider', provider)
+  },
+  plugins: {
+    list: () => ipcRenderer.invoke('get-plugins-list'),
+    toggle: (pluginId) => ipcRenderer.invoke('toggle-plugin', pluginId)
+  },
+  rag: {
+    search: (query, limit) => ipcRenderer.invoke('search-rag-memory', { query, limit })
+  },
+  audit: {
+    getLog: (limit) => ipcRenderer.invoke('get-audit-log', { limit })
+  }
 });
 
 // ─── Neural TTS Audio Player ────────────────────────────────────────────

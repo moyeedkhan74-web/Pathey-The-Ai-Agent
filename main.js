@@ -14,7 +14,7 @@ loadEnv();
 const { getAIResponse, clearHistory, getRawPlanFromAI, researchWithGoogle } = require('./ai');
 const { saveMemory, logActivity, appendMemory, readMemory, getMemoryContext, extractRememberText, extractProjectLink, appendProjectLink, findProjectLink } = require('./memory');
 const { extractToolCall, normalizeUrl, shouldStopAfterToolCall, isYouTubeWatchUrl, isGenericYouTubeUrl, extractYouTubeVideoIdFromHtml, extractYouTubeVideoIdsFromHtml, searchYouTubeVideos, scoreYouTubeCandidate, extractQuotedPhrases, isYouTubeVideoUnavailableHtml, isResearchRequest } = require('./browser_utils');
-const { executeTool: registryExecuteTool, getAvailableToolsList, getAllToolSchemas, registerPluginTools, isDangerous } = require('./tools/registry');
+const { executeTool: registryExecuteTool, getAvailableToolsList, getAllToolSchemas, registerPluginTools, unregisterPluginTools, isDangerous } = require('./tools/registry');
 const { loadPlugins } = require('./plugins');
 let mainWindow = null;
 let serverProcess = null;
@@ -30,6 +30,7 @@ let voskLineBuffer = '';
 let whisperProcess = null;
 let whisperPort = 5005;
 let whisperReady = false;
+let selectedModel = 'gemini';
 
 function sendVoiceCaptureTextToWindow(text) {
   if (mainWindow && mainWindow.webContents) {
@@ -1121,4 +1122,148 @@ ipcMain.handle('start-whisper', async () => {
 ipcMain.handle('stop-whisper', async () => {
   stopWhisperServer();
   return { ok: true };
+});
+
+// ─── HUD: Provider, Plugin, RAG, Audit IPC ────────────────────────────────
+const PROVIDER_ALLOWLIST = new Set(['gemini', 'nvidia', 'mistral', 'vercel', 'groq', 'ollama']);
+
+function getProviderHealth(provider) {
+  const keyMap = {
+    gemini: () => !!process.env.GEMINI_API_KEY,
+    nvidia: () => !!process.env.NVIDIA_API_KEY,
+    mistral: () => !!process.env.MISTRAL_API_KEY,
+    vercel: () => !!process.env.VERCEL_API_KEY,
+    groq: () => !!process.env.GROQ_API_KEY,
+    ollama: () => {
+      const base = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/+$/, '');
+      return !!process.env.OLLAMA_MODEL;
+    }
+  };
+  const check = keyMap[provider];
+  if (!check) return { status: 'offline', model: null };
+  const hasKey = check();
+  if (!hasKey) return { status: 'offline', model: null };
+  return { status: 'connected', model: provider };
+}
+
+ipcMain.handle('get-providers-status', async () => {
+  const status = {};
+  for (const provider of PROVIDER_ALLOWLIST) {
+    status[provider] = getProviderHealth(provider);
+  }
+  return status;
+});
+
+ipcMain.handle('set-active-provider', async (_event, provider) => {
+  if (!PROVIDER_ALLOWLIST.has(provider)) {
+    return { ok: false, error: 'Unknown provider', active: selectedModel || 'gemini' };
+  }
+  selectedModel = provider;
+  return { ok: true, active: provider };
+});
+
+const pluginEnabledState = new Map();
+
+ipcMain.handle('get-plugins-list', async () => {
+  try {
+    const pluginTools = require('./plugins');
+    const plugins = pluginTools.loadPlugins();
+    return plugins.map(p => ({
+      name: p.name,
+      description: p.description,
+      file: p.file,
+      enabled: pluginEnabledState.get(p.name) !== false,
+      tools: Object.entries(p.tools).map(([key, tool]) => ({
+        name: tool.name || key,
+        description: tool.description || '',
+        risk: tool.risk || 'medium'
+      }))
+    }));
+  } catch (err) {
+    console.warn('[Pathey HUD] get-plugins-list failed:', err.message);
+    return [];
+  }
+});
+
+ipcMain.handle('toggle-plugin', async (_event, pluginId) => {
+  if (typeof pluginId !== 'string' || pluginId.length > 200) {
+    return { ok: false, error: 'Invalid plugin ID' };
+  }
+  const current = pluginEnabledState.get(pluginId);
+  const next = current === false ? true : false;
+  pluginEnabledState.set(pluginId, next);
+  try {
+    const pluginTools = require('./plugins');
+    const plugins = pluginTools.loadPlugins();
+    const target = plugins.find(p => p.name === pluginId);
+    if (!target) {
+      pluginEnabledState.set(pluginId, current);
+      return { ok: false, error: 'Plugin not found' };
+    }
+    if (next) {
+      registerPluginTools(target.tools);
+    } else {
+      unregisterPluginTools(target.tools);
+    }
+    return { ok: true, enabled: next };
+  } catch (err) {
+    pluginEnabledState.set(pluginId, current);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('search-rag-memory', async (_event, { query, limit }) => {
+  if (typeof query !== 'string' || query.length > 500) {
+    return { results: [] };
+  }
+  if (!query.trim()) {
+    return { results: [] };
+  }
+  const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 5));
+  try {
+    const { searchRelevantChunks } = require('./memory');
+    const results = await searchRelevantChunks(query, safeLimit);
+    return {
+      results: results.map(r => ({
+        id: `${r.source}-${r.title}-${r.score}`,
+        documentName: r.title || r.source,
+        chunkText: r.content,
+        score: r.score,
+        page: null
+      }))
+    };
+  } catch (err) {
+    console.warn('[Pathey HUD] search-rag-memory failed:', err.message);
+    return { results: [] };
+  }
+});
+
+ipcMain.handle('get-audit-log', async (_event, { limit }) => {
+  const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+  try {
+    const db = require('./memory').getDb();
+    const stmt = db.prepare(`
+      SELECT action, details, timestamp FROM activity_log
+      ORDER BY timestamp DESC
+      LIMIT ?
+    `);
+    const rows = stmt.all(safeLimit);
+    const sanitized = rows.map(r => {
+      let details = r.details || '';
+      if (details.length > 200) details = details.slice(0, 200) + '...';
+      if (/api[_-]?key|token|password|secret|bearer/i.test(details)) {
+        details = '[redacted]';
+      }
+      return {
+        timestamp: r.timestamp,
+        action: r.action,
+        details,
+        status: 'completed'
+      };
+    });
+    return sanitized;
+  } catch (err) {
+    console.warn('[Pathey HUD] get-audit-log failed:', err.message);
+    return [];
+  }
 });

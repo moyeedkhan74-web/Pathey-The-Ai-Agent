@@ -1,0 +1,167 @@
+/* assets/css/hud.css - Provider Widget, Audit Panel, Shared HUD Styles */
+
+/* ── Provider Widget (top bar) ── */
+#provider-deck {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--glass-border);
+  padding: 5px 12px;
+  border-radius: 20px;
+  backdrop-filter: blur(14px);
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
+  cursor: default;
+}
+
+.provider-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.provider-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.provider-dot.connected {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+}
+
+.provider-dot.degraded {
+  background: #ffb74d;
+  box-shadow: 0 0 8px #ffb74d;
+}
+
+.provider-dot.offline {
+  background: var(--red);
+  box-shadow: 0 0 8px var(--red);
+}
+
+.provider-dot.switching {
+  background: var(--cyan);
+  animation: pulseDot 0.6s infinite alternate;
+}
+
+@keyframes pulseDot {
+  from { opacity: 0.3; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1.2); }
+}
+
+/* ── Audit Panel ── */
+#audit-panel {
+  position: absolute;
+  top: 80px;
+  right: 348px;
+  width: 280px;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  z-index: 8;
+  display: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(90,215,255,0.15) transparent;
+}
+
+#audit-panel.visible {
+  display: block;
+}
+
+.audit-entry {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.audit-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.audit-action {
+  color: var(--cyan);
+  font-weight: 500;
+}
+
+.audit-time {
+  color: var(--text-dim);
+  font-size: 8.5px;
+}
+
+.audit-details {
+  color: var(--text-dim);
+  font-size: 9.5px;
+  word-break: break-all;
+}
+
+.audit-status {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.audit-status.completed {
+  background: rgba(61, 255, 160, 0.15);
+  color: #3dffa0;
+}
+
+.audit-status.error {
+  background: rgba(255, 90, 106, 0.15);
+  color: #ff5a6a;
+}
+
+/* ── Shared states ── */
+.loading-state {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+.error-state {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--red);
+  padding: 8px 0;
+}
+
+.empty-state {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 8px 0;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

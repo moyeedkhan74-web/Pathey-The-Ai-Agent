@@ -7,6 +7,9 @@
 <meta name="description" content="Pathey — your portable AI companion, like JARVIS. Runs from a USB drive.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/hud.css">
+<link rel="stylesheet" href="assets/css/panels.css">
+<link rel="stylesheet" href="assets/css/plugins.css">
 <style>
   :root {
     --bg: #05070b;
@@ -771,6 +774,8 @@
   #tasks-show { top: 82px; left: 248px; }
   #neural-show { top: 100px; left: 270px; }
   #chat-show { top: 82px; right: 24px; }
+  #plugins-show { top: 82px; left: 472px; }
+  #audit-show { top: 82px; right: 348px; }
 
   @media (max-width: 900px) {
     #memory-panel { display: none; }
@@ -871,6 +876,12 @@
   </div>
 
   <div id="top-controls">
+    <div id="provider-deck" class="glass" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:20px;">
+      <span class="provider-status-badge">
+        <span id="provider-status-dot" class="provider-dot"></span>
+        <span id="provider-status-text">READY</span>
+      </span>
+    </div>
     <button class="ctrl-btn" id="mute-btn" title="Toggle voice mute">MUTE</button>
     <button class="ctrl-btn" id="reset-btn" title="Clear session history">RESET</button>
     <button class="win-btn" id="min-btn" title="Minimize">_</button>
@@ -882,6 +893,8 @@
   <div class="panel-show-bar" id="tasks-show" title="Show Tasks panel">T</div>
   <div class="panel-show-bar" id="neural-show" title="Show Research panel">R</div>
   <div class="panel-show-bar" id="chat-show" title="Show Conversation panel">C</div>
+  <div class="panel-show-bar" id="plugins-show" title="Show Plugins panel">P</div>
+  <div class="panel-show-bar" id="audit-show" title="Show Audit Log panel">A</div>
 
   <div id="memory-panel" class="glass">
     <div class="panel-title">
@@ -890,6 +903,10 @@
         <button class="panel-ctrl-btn collapse-btn" title="Collapse">▲</button>
         <button class="panel-ctrl-btn hide-btn" title="Hide panel">x</button>
       </div>
+    </div>
+    <div class="rag-search-container">
+      <span class="rag-search-icon">&#x1F50D;</span>
+      <input type="search" id="rag-search-input" class="rag-search-input" placeholder="Search indexed PDFs & Notes..." autocomplete="off">
     </div>
     <div id="memory-list">
       <div id="memory-empty">Say "remember that..." to teach me</div>
@@ -928,6 +945,32 @@
     </div>
     <div id="chat-history">
       <div class="chat-empty">Ask me anything to get started...</div>
+    </div>
+  </div>
+
+  <div id="plugins-panel" class="glass">
+    <div class="panel-title">
+      <span>Plugins</span>
+      <div class="panel-controls">
+        <button class="panel-ctrl-btn collapse-btn" title="Collapse">▲</button>
+        <button class="panel-ctrl-btn hide-btn" title="Hide panel">x</button>
+      </div>
+    </div>
+    <div id="plugins-list">
+      <div class="loading-state">Loading plugins...</div>
+    </div>
+  </div>
+
+  <div id="audit-panel" class="glass">
+    <div class="panel-title">
+      <span>Activity Log</span>
+      <div class="panel-controls">
+        <button class="panel-ctrl-btn collapse-btn" title="Collapse">▲</button>
+        <button class="panel-ctrl-btn hide-btn" title="Hide panel">x</button>
+      </div>
+    </div>
+    <div id="audit-list">
+      <div class="loading-state">Loading activity...</div>
     </div>
   </div>
 
@@ -2441,7 +2484,9 @@ const PANELS = [
   { id: 'memory-panel', showId: 'memory-show' },
   { id: 'tasks-panel', showId: 'tasks-show' },
   { id: 'neural-panel', showId: 'neural-show' },
-  { id: 'chat-history-panel', showId: 'chat-show' }
+  { id: 'chat-history-panel', showId: 'chat-show' },
+  { id: 'plugins-panel', showId: 'plugins-show' },
+  { id: 'audit-panel', showId: 'audit-show' }
 ];
 
 PANELS.forEach(({ id, showId }) => {
@@ -3060,5 +3105,10 @@ window.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
   </div>
+
+  <script src="assets/js/providers.js"></script>
+  <script src="assets/js/plugins.js"></script>
+  <script src="assets/js/rag-explorer.js"></script>
+  <script src="assets/js/audit-log.js"></script>
 </body>
 </html>

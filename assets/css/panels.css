@@ -1,0 +1,131 @@
+/* assets/css/panels.css - AI Deck, RAG Explorer & Panel Styles */
+
+/* ── AI Provider Deck Widget ── */
+#provider-deck {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--glass-border);
+  padding: 6px 14px;
+  border-radius: 20px;
+  backdrop-filter: blur(14px);
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
+}
+
+.provider-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.provider-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: all 0.3s ease;
+}
+
+.provider-dot.connected {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+}
+
+.provider-dot.degraded {
+  background: #ffb74d;
+  box-shadow: 0 0 8px #ffb74d;
+}
+
+.provider-dot.offline {
+  background: var(--red);
+  box-shadow: 0 0 8px var(--red);
+}
+
+.provider-dot.switching {
+  background: var(--cyan);
+  animation: pulseDot 0.6s infinite alternate;
+}
+
+@keyframes pulseDot {
+  from { opacity: 0.3; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1.2); }
+}
+
+/* ── RAG Explorer Search Bar ── */
+.rag-search-container {
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.rag-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 30px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.25s ease;
+}
+
+.rag-search-input:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px rgba(90, 215, 255, 0.15);
+}
+
+.rag-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.rag-result-card {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.rag-result-card:hover {
+  border-color: var(--cyan);
+  background: rgba(90, 215, 255, 0.04);
+}
+
+.rag-result-source {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px;
+  color: var(--cyan);
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.rag-result-score {
+  color: var(--text-dim);
+  font-size: 8.5px;
+}
+
+.rag-result-snippet {
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

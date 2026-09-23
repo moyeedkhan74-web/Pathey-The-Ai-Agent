@@ -115,6 +115,14 @@ function registerPluginTools(pluginTools) {
   }
 }
 
+function unregisterPluginTools(pluginTools) {
+  for (const name of Object.keys(pluginTools)) {
+    if (TOOLS[name]) {
+      delete TOOLS[name];
+    }
+  }
+}
+
 function isDangerous(toolName) {
   const tool = TOOLS[toolName];
   return tool ? requiresConfirmation(tool.name) : true;
@@ -127,5 +135,6 @@ module.exports = {
   getAvailableToolsList,
   executeTool,
   registerPluginTools,
+  unregisterPluginTools,
   isDangerous
 };
