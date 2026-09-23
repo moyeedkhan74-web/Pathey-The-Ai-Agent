@@ -876,11 +876,19 @@
   </div>
 
   <div id="top-controls">
-    <div id="provider-deck" class="glass" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:20px;">
+    <div id="provider-deck" class="glass" style="display:flex;align-items:center;gap:8px;padding:4px 10px;border-radius:20px;">
       <span class="provider-status-badge">
         <span id="provider-status-dot" class="provider-dot"></span>
         <span id="provider-status-text">READY</span>
       </span>
+      <select id="model-select" class="model-dropdown">
+        <option value="auto">Auto Cascade</option>
+        <option value="gemini" selected>Gemini Flash</option>
+        <option value="groq">Groq (Llama 3.3)</option>
+        <option value="ollama">Ollama (Local)</option>
+        <option value="nvidia">NVIDIA GLM-5.2</option>
+        <option value="mistral">Mistral AI</option>
+      </select>
     </div>
     <button class="ctrl-btn" id="mute-btn" title="Toggle voice mute">MUTE</button>
     <button class="ctrl-btn" id="reset-btn" title="Clear session history">RESET</button>
@@ -948,7 +956,7 @@
     </div>
   </div>
 
-  <div id="plugins-panel" class="glass">
+  <div id="plugins-panel" class="glass visible">
     <div class="panel-title">
       <span>Plugins</span>
       <div class="panel-controls">
