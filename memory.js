@@ -1,4 +1,4 @@
-// memory.js — Portable SQLite logs + markdown memory for Pathey
+// memory.js — Portable SQLite logs + markdown memory + FTS5 search for Pathey
 
 const path = require('path');
 const fs = require('fs');
@@ -19,7 +19,11 @@ function getDb() {
       pragma() {},
       exec() {},
       prepare() {
-        return { run() {}, all() { return []; } };
+        return {
+          run() {},
+          all() { return []; },
+          get() { return {}; }
+        };
       }
     };
     return db;
@@ -40,6 +44,63 @@ function getDb() {
       content TEXT NOT NULL,
       timestamp TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS documents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      source TEXT NOT NULL UNIQUE,
+      mime_type TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      metadata TEXT
+    );
+    CREATE TABLE IF NOT EXISTS chunks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      document_id INTEGER NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      token_count INTEGER DEFAULT 0,
+      FOREIGN KEY (document_id) REFERENCES documents(id)
+    );
+    CREATE VIRTUAL TABLE IF NOT EXISTS conversation_fts USING fts5(
+      content,
+      content=conversation_log,
+      content_rowid=id,
+      tokenize='porter unicode61'
+    );
+    CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_fts USING fts5(
+      title,
+      content,
+      source,
+      tokenize='porter unicode61'
+    );
+    CREATE TRIGGER IF NOT EXISTS conversation_ai AFTER INSERT ON conversation_log BEGIN
+      INSERT INTO conversation_fts(rowid, content) VALUES (new.id, new.content);
+    END;
+    CREATE TRIGGER IF NOT EXISTS conversation_ad AFTER DELETE ON conversation_log BEGIN
+      INSERT INTO conversation_fts(conversation_fts, rowid, content) VALUES ('delete', old.id, old.content);
+    END;
+    CREATE TRIGGER IF NOT EXISTS conversation_au AFTER UPDATE ON conversation_log BEGIN
+      INSERT INTO conversation_fts(conversation_fts, rowid, content) VALUES ('delete', old.id, old.content);
+      INSERT INTO conversation_fts(rowid, content) VALUES (new.id, new.content);
+    END;
+    CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN
+      INSERT INTO knowledge_fts(rowid, title, content, source)
+      SELECT new.id, d.title, new.content, d.source
+      FROM documents d
+      WHERE d.id = new.document_id;
+    END;
+    CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN
+      INSERT INTO knowledge_fts(knowledge_fts, rowid, title, content, source)
+      VALUES ('delete', old.id, '', old.content, '');
+    END;
+    CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunks BEGIN
+      INSERT INTO knowledge_fts(knowledge_fts, rowid, title, content, source)
+      VALUES ('delete', old.id, '', old.content, '');
+      INSERT INTO knowledge_fts(rowid, title, content, source)
+      SELECT new.id, d.title, new.content, d.source
+      FROM documents d
+      WHERE d.id = new.document_id;
+    END;
   `);
   return db;
 }
@@ -62,7 +123,6 @@ function extractRememberText(message) {
   return match ? match[1].trim() : null;
 }
 
-// Detects: "my <project> (repo|link|github|url|website|site) is <url>"
 function extractProjectLink(text) {
   if (!text || typeof text !== 'string') return null;
   const m = text.match(/my\s+(.+?)\s+(?:repo|link|github|url|website|site|project)\s+is\s+(https?:\/\/[^\s]+)/i);
@@ -107,7 +167,6 @@ function findProjectLink(projectName) {
   return null;
 }
 
-// Upserts a project link into ## Projects section of pathey-memory.md
 function appendProjectLink(projectName, url) {
   const filePath = getMemoryFilePath();
   const entryLine = `- ${projectName}: ${url}`;
@@ -138,7 +197,6 @@ function appendProjectLink(projectName, url) {
       return line;
     });
     if (updated) { fs.writeFileSync(filePath, newLines.join('\n'), 'utf-8'); return; }
-    // Not found — insert right after the heading
     const headIdx = newLines.findIndex(l => l.trim() === projectsHeading);
     newLines.splice(headIdx + 1, 0, entryLine);
     fs.writeFileSync(filePath, newLines.join('\n'), 'utf-8');
@@ -151,7 +209,8 @@ function appendProjectLink(projectName, url) {
 function saveMemory(userMsg, aiMsg) {
   try {
     const now = new Date().toISOString();
-    const stmt = getDb().prepare('INSERT INTO conversation_log (role, content, timestamp) VALUES (?, ?, ?)');
+    const db = getDb();
+    const stmt = db.prepare('INSERT INTO conversation_log (role, content, timestamp) VALUES (?, ?, ?)');
     stmt.run('user', userMsg, now);
     stmt.run('assistant', aiMsg, now);
   } catch (err) {
@@ -191,35 +250,152 @@ async function extractPdfText(buffer) {
   }
 }
 
-async function readKnowledgeFiles() {
-  const knowledgeDir = getKnowledgeDir();
-  if (!fs.existsSync(knowledgeDir)) return '';
+function chunkText(text, chunkSize = 500, overlap = 100) {
+  const chunks = [];
+  const words = text.split(/\s+/);
+  let i = 0;
+  while (i < words.length) {
+    const chunk = words.slice(i, i + chunkSize).join(' ');
+    chunks.push(chunk);
+    i += chunkSize - overlap;
+  }
+  return chunks.filter(Boolean);
+}
 
-  let knowledgeContent = '';
+async function indexKnowledgeFiles() {
+  const knowledgeDir = getKnowledgeDir();
+  if (!fs.existsSync(knowledgeDir)) return;
+  const db = getDb();
+  const insertDocument = db.prepare(`
+    INSERT OR IGNORE INTO documents (title, source, mime_type, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const insertChunk = db.prepare(`
+    INSERT INTO chunks (document_id, chunk_index, content, token_count)
+    VALUES (?, ?, ?, ?)
+  `);
+
   try {
     const files = fs.readdirSync(knowledgeDir);
     for (const file of files) {
       const fullPath = path.join(knowledgeDir, file);
       const ext = path.extname(file).toLowerCase();
-
+      let text = '';
+      let mimeType = 'text/plain';
       if (ext === '.pdf') {
         const buffer = fs.readFileSync(fullPath);
-        const extracted = await extractPdfText(buffer);
-        if (extracted) {
-          knowledgeContent += `\n--- Knowledge from PDF [${file}] ---\n${extracted}\n`;
-        }
+        text = await extractPdfText(buffer);
+        mimeType = 'application/pdf';
       } else if (['.txt', '.md', '.json', '.slang'].includes(ext)) {
-        const content = fs.readFileSync(fullPath, 'utf-8');
-        if (content.trim()) {
-          knowledgeContent += `\n--- Knowledge from document [${file}] ---\n${content.trim()}\n`;
-        }
+        text = fs.readFileSync(fullPath, 'utf-8');
       }
+      if (!text.trim()) continue;
+      const now = new Date().toISOString();
+      insertDocument.run(file, `knowledge/${file}`, mimeType, now, now);
+      const docId = db.prepare('SELECT id FROM documents WHERE source = ?').get(`knowledge/${file}`).id;
+      const chunks = chunkText(text);
+      chunks.forEach((chunk, idx) => {
+        insertChunk.run(docId, idx, chunk, chunk.split(/\s+/).length);
+      });
     }
   } catch (err) {
-    console.warn('Knowledge dir read error:', err.message);
+    console.warn('Knowledge indexing error:', err.message);
   }
+}
 
-  return knowledgeContent;
+async function searchRelevantChunks(query, limit = 5) {
+  const db = getDb();
+  try {
+    const stmt = db.prepare(`
+      SELECT c.id, c.document_id, c.chunk_index, c.content, c.token_count,
+             d.title, d.source,
+             bm25(knowledge_fts) as score
+      FROM knowledge_fts
+      JOIN chunks c ON c.id = knowledge_fts.rowid
+      JOIN documents d ON d.id = c.document_id
+      WHERE knowledge_fts MATCH ?
+      ORDER BY score
+      LIMIT ?
+    `);
+    const results = stmt.all(query, limit);
+    return results.map(r => ({
+      title: r.title,
+      source: r.source,
+      content: r.content,
+      score: r.score,
+      token_count: r.token_count
+    }));
+  } catch (err) {
+    console.warn('[Pathey Memory] FTS search failed:', err.message);
+    return [];
+  }
+}
+
+async function searchConversation(query, limit = 5) {
+  const db = getDb();
+  try {
+    const stmt = db.prepare(`
+      SELECT id, role, content, timestamp,
+             bm25(conversation_fts) as score
+      FROM conversation_fts
+      WHERE conversation_fts MATCH ?
+      ORDER BY score
+      LIMIT ?
+    `);
+    const results = stmt.all(query, limit);
+    return results.map(r => ({
+      role: r.role,
+      content: r.content,
+      timestamp: r.timestamp,
+      score: r.score
+    }));
+  } catch (err) {
+    console.warn('[Pathey Memory] Conversation search failed:', err.message);
+    return [];
+  }
+}
+
+async function addKnowledgeNote(title, content) {
+  const db = getDb();
+  const insertDocument = db.prepare(`
+    INSERT INTO documents (title, source, mime_type, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const upsertDocument = db.prepare(`
+    INSERT INTO documents (title, source, mime_type, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(source) DO UPDATE SET title=excluded.title, updated_at=excluded.updated_at
+  `);
+  const insertChunk = db.prepare(`
+    INSERT INTO chunks (document_id, chunk_index, content, token_count)
+    VALUES (?, ?, ?, ?)
+  `);
+  const getDocId = db.prepare('SELECT id FROM documents WHERE source = ?');
+  const now = new Date().toISOString();
+  const source = 'manual';
+  upsertDocument.run(title || 'Untitled', source, 'text/plain', now, now);
+  const docRow = getDocId.get(source);
+  const docId = docRow && docRow.id ? docRow.id : 1;
+  const chunks = chunkText(content || '');
+  chunks.forEach((chunk, idx) => {
+    insertChunk.run(docId, idx, chunk, chunk.split(/\s+/).length);
+  });
+}
+
+async function buildContextFromSearch(query, maxTokens = 2000) {
+  const db = getDb();
+  const results = await searchRelevantChunks(query, 10);
+  if (!results.length) return '';
+
+  let context = '';
+  let totalTokens = 0;
+  for (const r of results) {
+    const tokens = r.token_count || r.content.split(/\s+/).length;
+    if (totalTokens + tokens > maxTokens) break;
+    context += `[${r.source}] ${r.content}\n\n`;
+    totalTokens += tokens;
+  }
+  return context.trim();
 }
 
 async function readMemory() {
@@ -230,8 +406,20 @@ async function readMemory() {
       baseMemory = fs.readFileSync(memoryPath, 'utf-8');
     } catch (_) {}
   }
-  const knowledge = await readKnowledgeFiles();
-  return (baseMemory + (knowledge ? '\n\n' + knowledge : '')).trim();
+  return baseMemory.trim();
+}
+
+async function getMemoryContext(query, maxTokens = 2000) {
+  const memoryPath = getMemoryFilePath();
+  let baseMemory = '';
+  if (fs.existsSync(memoryPath)) {
+    try {
+      baseMemory = fs.readFileSync(memoryPath, 'utf-8');
+    } catch (_) {}
+  }
+  const relevantChunks = await buildContextFromSearch(query, maxTokens);
+  const parts = [baseMemory, relevantChunks].filter(Boolean);
+  return parts.join('\n\n').trim();
 }
 
 function clearHistory() {
@@ -252,5 +440,11 @@ module.exports = {
   logActivity,
   appendMemory,
   readMemory,
-  clearHistory
+  clearHistory,
+  indexKnowledgeFiles,
+  searchRelevantChunks,
+  searchConversation,
+  addKnowledgeNote,
+  buildContextFromSearch,
+  getMemoryContext
 };

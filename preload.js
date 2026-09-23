@@ -40,6 +40,11 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('plan-update', handler);
     return () => ipcRenderer.removeListener('plan-update', handler);
   },
+  confirmAction: (message) => ipcRenderer.invoke('confirm-action', message),
+  onConfirmAction: (callback) => {
+    ipcRenderer.removeAllListeners('confirm-action-result');
+    ipcRenderer.on('confirm-action-result', (_event, confirmed) => callback(confirmed));
+  },
   onTtsAudioEnded: (callback) => {
     ttsAudioEndedCallbacks.push(callback);
     return () => {

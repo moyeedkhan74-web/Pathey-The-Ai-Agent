@@ -12,8 +12,10 @@ const { loadEnv, getBasePath } = require('./paths');
 const { speak, stopSpeech, setMainWindow, onQueuedAudioEnded } = require('./voice');
 loadEnv();
 const { getAIResponse, clearHistory, getRawPlanFromAI, researchWithGoogle } = require('./ai');
-const { saveMemory, logActivity, appendMemory, readMemory, extractRememberText, extractProjectLink, appendProjectLink, findProjectLink } = require('./memory');
+const { saveMemory, logActivity, appendMemory, readMemory, getMemoryContext, extractRememberText, extractProjectLink, appendProjectLink, findProjectLink } = require('./memory');
 const { extractToolCall, normalizeUrl, shouldStopAfterToolCall, isYouTubeWatchUrl, isGenericYouTubeUrl, extractYouTubeVideoIdFromHtml, extractYouTubeVideoIdsFromHtml, searchYouTubeVideos, scoreYouTubeCandidate, extractQuotedPhrases, isYouTubeVideoUnavailableHtml, isResearchRequest } = require('./browser_utils');
+const { executeTool: registryExecuteTool, getAvailableToolsList, getAllToolSchemas, registerPluginTools, isDangerous } = require('./tools/registry');
+const { loadPlugins } = require('./plugins');
 let mainWindow = null;
 let serverProcess = null;
 let voiceCaptureProcess = null;
@@ -317,8 +319,39 @@ function findWindowsApp(name) {
 }
 
 async function confirmAction(actionDescription) {
+  const dangerousKeywords = /run\s+command|write\s+file|delete|remove|open\s+app|launch\s+app|execute|shell|cmd\s*\//i;
+  if (dangerousKeywords.test(actionDescription)) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        const confirmed = await mainWindow.webContents.executeJavaScript(`new Promise((resolve) => {
+          const modal = document.getElementById('confirm-modal');
+          const msg = document.getElementById('confirm-message');
+          const allowBtn = document.getElementById('confirm-allow');
+          const denyBtn = document.getElementById('confirm-deny');
+          if (!modal) { resolve(true); return; }
+          msg.textContent = '${actionDescription.replace(/'/g, "\\'")}';
+          modal.classList.add('show');
+          const cleanup = (val) => { modal.classList.remove('show'); resolve(val); };
+          allowBtn.onclick = () => cleanup(true);
+          denyBtn.onclick = () => cleanup(false);
+        })`);
+        return confirmed === true;
+      } catch (_) {}
+    }
+    return false;
+  }
   console.log(`[Pathey] Autonomously executing: ${actionDescription}`);
   return true;
+}
+
+async function handleOpenUrl(args = {}) {
+  const { openUrl: openUrlImpl } = require('./tools/browser');
+  return openUrlImpl(args, { runResearch });
+}
+
+async function handleOpenApp(args = {}) {
+  const { openApp: openAppImpl } = require('./tools/browser');
+  return openAppImpl(args);
 }
 
 function extractProjectOpenRequest(message) {
@@ -364,220 +397,14 @@ async function pickBestYouTubeVideo(query, fallbackUrl, channelFilter = '') {
 async function executeTool(toolCall) {
   const { tool, args = {} } = toolCall || {};
   const name = tool || 'unknown';
-  if (name === 'list_directory') {
-    const target = args.path || '.';
-    logActivity('list_directory', target);
-    try {
-      const entries = fs.readdirSync(target, { withFileTypes: true });
-      return JSON.stringify(entries.map((entry) => ({ name: entry.name, isDirectory: entry.isDirectory() })), null, 2);
-    } catch (err) {
-      return `Error: ${err.message}`;
-    }
-  }
-  if (name === 'read_file') {
-    const target = args.path;
-    if (!target) return 'No path provided.';
-    logActivity('read_file', target);
-    try {
-      return fs.readFileSync(target, 'utf8');
-    } catch (err) {
-      return `Error: ${err.message}`;
-    }
-  }
-  if (name === 'git_status') {
-    const target = args.path || __dirname;
-    logActivity('git_status', target);
-    try {
-      const output = await new Promise((resolve, reject) => {
-        exec('git status --short', { cwd: target }, (error, stdout, stderr) => {
-          if (error && !stdout && !stderr) return reject(error);
-          resolve((stdout || stderr || '').trim());
-        });
-      });
-      return output || 'No git status output.';
-    } catch (err) {
-      return `Error: ${err.message}`;
-    }
-  }
-  if (name === 'run_command') {
-    const cmd = args.cmd;
-    if (!cmd) return 'No command provided.';
-    const confirmed = await confirmAction(`run command: ${cmd}`);
-    if (!confirmed) return 'Cancelled by user.';
-    logActivity('run_command', cmd);
-    try {
-      const output = await new Promise((resolve) => {
-        exec(cmd, { timeout: 30000 }, (error, stdout, stderr) => {
-          const result = (stdout || stderr || (error ? error.message : 'Command completed with no output.')).trim();
-          resolve(result);
-        });
-      });
-      return output;
-    } catch (err) {
-      return `Error: ${err.message}`;
-    }
-  }
-  if (name === 'write_file') {
-    const target = args.path;
-    const content = args.content;
-    if (!target) return 'No path provided.';
-    const confirmed = await confirmAction(`write file: ${target}`);
-    if (!confirmed) return 'Cancelled by user.';
-    logActivity('write_file', target);
-    try {
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, content || '', 'utf8');
-      return `Wrote file: ${target}`;
-    } catch (err) {
-      return `Error: ${err.message}`;
-    }
-  }
   if (name === 'open_url') {
-    let url = normalizeUrl(args.url || args.link || '');
-    if (!url) return 'No URL provided.';
-
-    // Safety net: intercept any search-engine query URL → redirect to research
-    // Skip YouTube and direct portals (ChatGPT, Gemini, Claude, Mail)
-    const isYouTube = isYouTubeWatchUrl(url) || isGenericYouTubeUrl(url);
-    const isDirectPortal = /chatgpt\.com|claude\.ai|gemini\.google\.com|mail\.google\.com|outlook\.live\.com/i.test(url);
-    if (!isYouTube && !isDirectPortal && !args.forceBrowser) {
-      const KNOWN_SEARCH_ENGINES = /(?:google\.com\/search|bing\.com\/search|duckduckgo\.com|search\.yahoo\.com|search\.brave\.com|search\.aol\.com|ask\.com|startpage\.com|ecosia\.org\/search|yandex\.com\/search)/i;
-      const SEARCH_PARAM_RE = /[?&](?:q|query|p|text)=([^&#]+)/i;
-      const SEARCH_PATH_RE = /\/(?:search|results)\b/i;
-      const isKnownEngine = KNOWN_SEARCH_ENGINES.test(url);
-      const hasSearchParam = SEARCH_PARAM_RE.test(url);
-      const hasSearchPath = SEARCH_PATH_RE.test(url);
-      if (isKnownEngine || hasSearchParam || hasSearchPath) {
-        const queryMatch = url.match(SEARCH_PARAM_RE);
-        const query = queryMatch ? decodeURIComponent(queryMatch[1]) : (args.searchQuery || 'general search');
-        logActivity('open_url_redirected_to_research', { originalUrl: url, query });
-        const researchResult = await runResearch(query);
-        return researchResult;
-      }
-    }
-
-    // YouTube URL handling: always resolve to a direct, playable watch URL.
-    if (isYouTubeWatchUrl(url)) {
-      const playable = await isYouTubeWatchUrlPlayable(url);
-      if (!playable) {
-        console.warn(`[YouTube Resolver] Watch URL not playable: ${url}`);
-        if (args.searchQuery) {
-          const resolved = await pickBestYouTubeVideo(args.searchQuery, null, activeYouTubeChannelFilter);
-          if (resolved) {
-            url = resolved;
-          } else {
-            return `The video at ${url} is unavailable and I couldn't find a working version. Please tell me the exact song/video name and artist.`;
-          }
-        } else {
-          return `The video link ${url} is unavailable. Please give me the exact song name and artist and I will find and play the official video.`;
-        }
-      }
-    } else if (isGenericYouTubeUrl(url)) {
-      let searchQuery = args.searchQuery || '';
-      try {
-        const parsed = new URL(url);
-        if (parsed.hostname.includes('youtube.com') && parsed.pathname === '/results') {
-          searchQuery = parsed.searchParams.get('search_query') || searchQuery;
-        }
-      } catch (_) {}
-      const resolved = searchQuery ? await pickBestYouTubeVideo(searchQuery, null, activeYouTubeChannelFilter) : null;
-      if (resolved) {
-        url = resolved;
-      } else if (searchQuery) {
-        return `I couldn't auto-resolve a playable video for "${searchQuery}". Please try again with the exact song name and artist.`;
-      } else {
-        return `Please provide a specific song or video to play.`;
-      }
-    }
-
-    // Set clipboard if requested
-    if (args.clipboard) {
-      try {
-        console.log(`[open_url] Setting clipboard using Electron API: ${args.clipboard}`);
-        clipboard.writeText(args.clipboard);
-      } catch (clipErr) {
-        console.warn(`[open_url] Failed to write clipboard:`, clipErr.message);
-      }
-    }
-
-    const confirmed = await confirmAction(`open URL: ${url}`);
-    if (!confirmed) return 'Cancelled by user.';
-    logActivity('open_url', url);
-    try {
-      const isChatbot = url.includes('chatgpt.com') || url.includes('claude.ai') || url.includes('gemini.google.com') || args.autoSubmit;
-      const triggerAutoSubmit = () => {
-        if (isChatbot && args.clipboard) {
-          console.log(`[open_url] Chatbot auto-automation: Scheduling paste/submit in background`);
-          const psCommand = `powershell.exe -NoProfile -Command ` + 
-            `"$wshell = New-Object -ComObject wscript.shell; ` +
-            `Start-Sleep -Seconds 2.5; ` +
-            `$wshell.SendKeys('^v'); ` +
-            `Start-Sleep -Milliseconds 300; ` +
-            `$wshell.SendKeys('{ENTER}')"`;
-          
-          exec(psCommand, (err) => {
-            if (err) console.warn('[open_url] Auto-automation script failed:', err.message);
-          });
-        }
-      };
-
-      if (args.browser) {
-        const browserName = args.browser.trim().toLowerCase();
-        const exeName = browserName.endsWith('.exe') ? browserName : `${browserName}.exe`;
-        const browserPath = findWindowsApp(exeName);
-        if (browserPath) {
-          console.log(`[open_url] Spawning custom browser: ${browserPath} with URL: ${url}`);
-          const child = spawn(browserPath, [url], { detached: true, stdio: 'ignore' });
-          child.on('error', (spawnErr) => {
-            console.error(`[open_url] Failed to launch custom browser '${exeName}':`, spawnErr.message);
-          });
-          child.unref();
-          triggerAutoSubmit();
-          return `Opened: ${url} in custom browser (${browserName})`;
-        } else {
-          console.warn(`[open_url] Custom browser '${browserName}' not found. Falling back to default browser...`);
-        }
-      }
-
-      await shell.openExternal(url);
-      triggerAutoSubmit();
-      return `Opened: ${url}`;
-    } catch (err) {
-      return `Error: ${err.message}`;
-    }
+    return await handleOpenUrl(args);
   }
   if (name === 'open_app') {
-    const appName = args.name;
-    if (!appName) return 'No app name provided.';
-    const confirmed = await confirmAction(`open app: ${appName}`);
-    if (!confirmed) return 'Cancelled by user.';
-    logActivity('open_app', appName);
-    try {
-      const resolvedPath = findWindowsApp(appName);
-      if (resolvedPath) {
-        console.log(`[Pathey] Resolved app '${appName}' to '${resolvedPath}'`);
-        const errStr = await shell.openPath(resolvedPath);
-        if (errStr) {
-          throw new Error(errStr);
-        }
-        return `Opened app: ${appName} (${path.basename(resolvedPath)})`;
-      }
-      
-      console.log(`[Pathey] App path for '${appName}' not resolved, falling back to direct spawn`);
-      const child = spawn(appName, { detached: true, stdio: 'ignore' });
-      child.on('error', (spawnErr) => {
-        console.error(`[Pathey] Spawn error for '${appName}':`, spawnErr.message);
-      });
-      child.unref();
-      return `Opened app (spawn fallback): ${appName}`;
-    } catch (err) {
-      return `Error: ${err.message}`;
-    }
+    return await handleOpenApp(args);
   }
-  return `Unknown tool: ${name}`;
+  return await registryExecuteTool(name, args);
 }
-// Read-only tools can be parallelised safely
-const READ_ONLY_TOOLS = new Set(['list_directory', 'read_file', 'git_status']);
 
 function sendPlanUpdate(update) {
   if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
@@ -684,7 +511,7 @@ async function runResearch(query) {
 }
 
 async function runAgentLoop(userMessage, options = {}) {
-  const memoryContext = await readMemory();
+  const memoryContext = await getMemoryContext(userMessage);
 
   // Step 1: Ask AI for a structured plan
   const rawPlan = await getRawPlanFromAI(userMessage, memoryContext);
@@ -1180,7 +1007,7 @@ ipcMain.handle('chat', async (_event, message, options = {}) => {
     return `Something went wrong: ${err.message}`;
   }
 });
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
     console.log(`[Pathey Main] Permission requested: '${permission}' from ${webContents ? webContents.getURL() : 'unknown'}`);
     callback(true);
@@ -1203,6 +1030,25 @@ app.whenReady().then(() => {
     session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
       callback({});
     });
+  }
+
+  try {
+    const pluginTools = require('./plugins');
+    const plugins = pluginTools.loadPlugins();
+    for (const plugin of plugins) {
+      registerPluginTools(plugin.tools);
+    }
+    console.log(`[Pathey] Loaded ${plugins.length} plugins`);
+  } catch (err) {
+    console.warn('[Pathey] Plugin loading failed:', err.message);
+  }
+
+  try {
+    const { indexKnowledgeFiles } = require('./memory');
+    await indexKnowledgeFiles();
+    console.log('[Pathey] Knowledge files indexed');
+  } catch (err) {
+    console.warn('[Pathey] Knowledge indexing failed:', err.message);
   }
 
   createWindow();

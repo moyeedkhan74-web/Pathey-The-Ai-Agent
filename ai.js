@@ -1,10 +1,11 @@
-// ai.js — Gemini-only AI integration for Pathey
+// ai.js — Multi-provider AI integration for Pathey
 let GoogleGenAI = null;
 try {
   ({ GoogleGenAI } = require('@google/genai'));
 } catch (err) {
   console.warn('[Pathey AI] @google/genai unavailable, using offline fallback:', err.message);
 }
+const { getAvailableToolsList, getAllToolSchemas } = require('./tools/registry');
 const conversationHistory = [];
 const MAX_HISTORY = 20;
 let activeGeminiKeyIndex = 0;
@@ -113,6 +114,8 @@ Format rule:
 }
 
 function buildPlannerPrompt(userMessage, memoryContext) {
+  const tools = getAvailableToolsList();
+  const toolsList = tools.join(', ');
   let sys = `You are Pathey's task planner — a friendly, energetic AI with a Peter Parker vibe. Given a user request, decompose it into a step-by-step plan.
 
 Return ONLY a JSON object with this structure (no markdown, no extra text):
@@ -122,7 +125,7 @@ Return ONLY a JSON object with this structure (no markdown, no extra text):
   {"step": 3, "tool": "<tool_name>", "args": {<args>}, "parallel_group": "B"}
 ]}
 
-Available tools: list_directory, read_file, git_status, run_command, write_file, open_url, open_app
+Available tools: ${toolsList}
 
 YouTube rule: If the user asks to play a song/video, the open_url step MUST use a YouTube search URL ("https://www.youtube.com/results?search_query=<query>") and MAY include a "searchQuery" arg with the raw query. NEVER guess or fabricate a watch?v=<id> URL.
 
@@ -335,10 +338,91 @@ async function tryVercel(message, systemInstruction) {
   return null;
 }
 
+async function tryGroq(message, systemInstruction) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: message }
+        ]
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.choices?.[0]?.message?.content;
+      if (text && text.trim()) return text.trim();
+    }
+  } catch (err) {
+    console.warn('[Pathey Groq] Failed:', err.message);
+  }
+  return null;
+}
+
+async function tryOllama(message, systemInstruction) {
+  const baseUrl = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/+$/, '');
+  const model = process.env.OLLAMA_MODEL || 'llama3.2';
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120000);
+    const res = await fetch(`${baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: message }
+        ],
+        stream: false
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.message?.content;
+      if (text && text.trim()) return text.trim();
+    }
+  } catch (err) {
+    console.warn('[Pathey Ollama] Failed:', err.message);
+  }
+  return null;
+}
+
 async function getAIResponse(message, memoryContext, preferredModel, history = []) {
   const systemInstruction = buildSystemPrompt(memoryContext);
 
-  // 1. Try explicitly preferred model if requested
+  if (preferredModel === 'ollama') {
+    const reply = await tryOllama(message, systemInstruction);
+    if (reply) {
+      conversationHistory.push({ role: 'user', content: message });
+      conversationHistory.push({ role: 'assistant', content: reply });
+      while (conversationHistory.length > MAX_HISTORY * 2) conversationHistory.splice(0, 2);
+      return reply;
+    }
+  }
+  if (preferredModel === 'groq') {
+    const reply = await tryGroq(message, systemInstruction);
+    if (reply) {
+      conversationHistory.push({ role: 'user', content: message });
+      conversationHistory.push({ role: 'assistant', content: reply });
+      while (conversationHistory.length > MAX_HISTORY * 2) conversationHistory.splice(0, 2);
+      return reply;
+    }
+  }
   if (preferredModel === 'nvidia') {
     const nReply = await tryNvidia(message, systemInstruction);
     if (nReply) return nReply;
@@ -352,7 +436,6 @@ async function getAIResponse(message, memoryContext, preferredModel, history = [
     if (vReply) return vReply;
   }
 
-  // 2. Main Cascade Order: Gemini (Google AI Studio) -> NVIDIA -> Mistral -> Vercel (Least Priority)
   try {
     const geminiReply = await tryGemini(message, systemInstruction, history);
     if (geminiReply) {
@@ -365,7 +448,22 @@ async function getAIResponse(message, memoryContext, preferredModel, history = [
     console.warn('[Pathey AI] Gemini request failed:', err.message);
   }
 
-  // Fallback 1: NVIDIA
+  const ollamaReply = await tryOllama(message, systemInstruction);
+  if (ollamaReply) {
+    conversationHistory.push({ role: 'user', content: message });
+    conversationHistory.push({ role: 'assistant', content: ollamaReply });
+    while (conversationHistory.length > MAX_HISTORY * 2) conversationHistory.splice(0, 2);
+    return ollamaReply;
+  }
+
+  const groqReply = await tryGroq(message, systemInstruction);
+  if (groqReply) {
+    conversationHistory.push({ role: 'user', content: message });
+    conversationHistory.push({ role: 'assistant', content: groqReply });
+    while (conversationHistory.length > MAX_HISTORY * 2) conversationHistory.splice(0, 2);
+    return groqReply;
+  }
+
   const nvidiaReply = await tryNvidia(message, systemInstruction);
   if (nvidiaReply) {
     conversationHistory.push({ role: 'user', content: message });
@@ -374,7 +472,6 @@ async function getAIResponse(message, memoryContext, preferredModel, history = [
     return nvidiaReply;
   }
 
-  // Fallback 2: Mistral
   const mistralReply = await tryMistral(message, systemInstruction);
   if (mistralReply) {
     conversationHistory.push({ role: 'user', content: message });
@@ -383,7 +480,6 @@ async function getAIResponse(message, memoryContext, preferredModel, history = [
     return mistralReply;
   }
 
-  // Fallback 3: Vercel (Least Priority)
   const vercelReply = await tryVercel(message, systemInstruction);
   if (vercelReply) {
     conversationHistory.push({ role: 'user', content: message });
@@ -392,7 +488,7 @@ async function getAIResponse(message, memoryContext, preferredModel, history = [
     return vercelReply;
   }
 
-  return 'Sorry, all AI providers (Gemini, NVIDIA, Mistral, Vercel) are currently unavailable. Please check your API keys in .env.';
+  return 'Sorry, all AI providers (Gemini, NVIDIA, Mistral, Vercel, Groq, Ollama) are currently unavailable. Please check your API keys in .env or ensure Ollama is running.';
 }
 function clearHistory() {
   conversationHistory.length = 0;

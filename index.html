@@ -792,6 +792,65 @@
   #boot-sub.in { opacity: 1; }
 
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  /* â”€â”€ Confirmation Modal â”€â”€ */
+  #confirm-modal {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+  #confirm-modal.show { display: flex; }
+  #confirm-modal .confirm-box {
+    background: rgba(10,14,22,0.95);
+    border: 1px solid var(--glass-border-hover);
+    border-radius: 16px;
+    padding: 24px 28px;
+    max-width: 480px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  #confirm-modal .confirm-title {
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  #confirm-modal .confirm-body {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.6;
+    margin-bottom: 20px;
+    word-break: break-word;
+  }
+  #confirm-modal .confirm-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+  #confirm-modal .confirm-btn {
+    padding: 8px 18px;
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  #confirm-modal .confirm-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  #confirm-modal .confirm-btn.danger { border-color: rgba(255,90,106,0.6); color: var(--red); background: rgba(255,90,106,0.12); }
+  #confirm-modal .confirm-btn.danger:hover { border-color: var(--red); color: var(--red); background: rgba(255,90,106,0.25); }
+  #confirm-modal .confirm-btn.safe { border-color: rgba(61,255,160,0.4); color: var(--green); background: rgba(61,255,160,0.08); }
+  #confirm-modal .confirm-btn.safe:hover { border-color: var(--green); color: var(--green); }
 </style>
 </head>
 <body>
@@ -908,11 +967,13 @@
         <option value="nvidia">NVIDIA GLM-5.2</option>
         <option value="mistral">Mistral AI</option>
         <option value="vercel">Vercel AI (GPT-4o)</option>
+        <option value="groq">Groq (Llama 3.3)</option>
+        <option value="ollama">Ollama (Local)</option>
       </select>
     </div>
     <div class="indicator" id="session-count">0 messages</div>
+    </div>
   </div>
-</div>
 
 <script src="chart.umd.min.js"></script>
 <script>
@@ -2329,6 +2390,42 @@ resetBtn.addEventListener('click', async () => {
   setState('idle');
 });
 
+// â”€â”€ Confirmation Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const confirmModal = document.getElementById('confirm-modal');
+const confirmMessage = document.getElementById('confirm-message');
+const confirmAllowBtn = document.getElementById('confirm-allow');
+const confirmDenyBtn = document.getElementById('confirm-deny');
+let confirmResolve = null;
+
+function showConfirmModal(message) {
+  return new Promise((resolve) => {
+    confirmResolve = resolve;
+    confirmMessage.textContent = message;
+    confirmModal.classList.add('show');
+  });
+}
+
+function hideConfirmModal() {
+  confirmModal.classList.remove('show');
+  confirmResolve = null;
+}
+
+confirmAllowBtn.addEventListener('click', () => {
+  if (confirmResolve) confirmResolve(true);
+  hideConfirmModal();
+});
+
+confirmDenyBtn.addEventListener('click', () => {
+  if (confirmResolve) confirmResolve(false);
+  hideConfirmModal();
+});
+
+window.api.confirmAction = async (message) => {
+  const confirmed = await showConfirmModal(message);
+  hideConfirmModal();
+  return confirmed;
+};
+
 // â”€â”€ Panel Collapse / Hide / Re-show Controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const PANELS = [
   { id: 'memory-panel', showId: 'memory-show' },
@@ -2925,7 +3022,18 @@ window.addEventListener('DOMContentLoaded', () => {
       speakBootLine("Assalam u alaikum Khan sahab, I'm pathey_ AI agent, system initialized at your service.", 'online');
     }, 50);
   }
-})();
-</script>
+  })();
+  </script>
+
+  <div id="confirm-modal">
+    <div class="confirm-box">
+      <div class="confirm-title">Confirm Action</div>
+      <div class="confirm-body" id="confirm-message"></div>
+      <div class="confirm-actions">
+        <button class="confirm-btn danger" id="confirm-deny">Deny</button>
+        <button class="confirm-btn safe" id="confirm-allow">Allow</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
