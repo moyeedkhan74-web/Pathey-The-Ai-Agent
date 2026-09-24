@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('api', {
   setActiveProvider: (provider) => ipcRenderer.invoke('set-active-provider', provider),
   getPluginsList: () => ipcRenderer.invoke('get-plugins-list'),
   togglePlugin: (pluginId) => ipcRenderer.invoke('toggle-plugin', pluginId),
+  searchKnowledge: (query, limit) => ipcRenderer.invoke('search-rag-memory', { query, limit }),
   searchRagMemory: (query, limit) => ipcRenderer.invoke('search-rag-memory', { query, limit }),
   getAuditLog: (limit) => ipcRenderer.invoke('get-audit-log', { limit }),
   mcpGetStatus: () => ipcRenderer.invoke('mcp:get-status'),
@@ -78,8 +79,11 @@ contextBridge.exposeInMainWorld('pathey', {
     setActive: (provider) => ipcRenderer.invoke('set-active-provider', provider)
   },
   plugins: {
-    list: () => ipcRenderer.invoke('get-plugins-list'),
-    toggle: (pluginId) => ipcRenderer.invoke('toggle-plugin', pluginId)
+    list: async () => {
+      const plugins = await ipcRenderer.invoke('get-plugins-list');
+      return (plugins || []).map(p => ({ ...p, id: p.id || p.name }));
+    },
+    toggle: (pluginId, enabled) => ipcRenderer.invoke('toggle-plugin', pluginId, enabled)
   },
   rag: {
     search: (query, limit) => ipcRenderer.invoke('search-rag-memory', { query, limit })
@@ -88,15 +92,27 @@ contextBridge.exposeInMainWorld('pathey', {
     getLog: (limit) => ipcRenderer.invoke('get-audit-log', { limit })
   },
   mcp: {
+    list: async () => {
+      const servers = await ipcRenderer.invoke('mcp:get-servers');
+      return (servers || []).map(s => ({ ...s, id: s.id || s.name }));
+    },
     getStatus: () => ipcRenderer.invoke('mcp:get-status'),
-    getServers: () => ipcRenderer.invoke('mcp:get-servers'),
+    getServers: async () => {
+      const servers = await ipcRenderer.invoke('mcp:get-servers');
+      return (servers || []).map(s => ({ ...s, id: s.id || s.name }));
+    },
     connect: (config) => ipcRenderer.invoke('mcp:connect', config),
     disconnect: (name) => ipcRenderer.invoke('mcp:disconnect', name),
     addServer: (config) => ipcRenderer.invoke('mcp:add-server', config),
-    updateServer: (name, config) => ipcRenderer.invoke('mcp:update-server', name, config),
-    removeServer: (name) => ipcRenderer.invoke('mcp:remove-server', name),
-    toggleServer: (name, enabled) => ipcRenderer.invoke('mcp:toggle-server', name, enabled),
-    addPreset: (presetName) => ipcRenderer.invoke('mcp:add-preset', presetName)
+    updateServer: (id, config) => ipcRenderer.invoke('mcp:update-server', id, config),
+    removeServer: (id) => ipcRenderer.invoke('mcp:remove-server', id),
+    toggleServer: (id, enabled) => ipcRenderer.invoke('mcp:toggle-server', id, enabled),
+    addPreset: (presetName) => ipcRenderer.invoke('mcp:add-preset', presetName),
+    onStatus: (callback) => {
+      const handler = (_event, status) => callback(status);
+      ipcRenderer.on('mcp:status-changed', handler);
+      return () => ipcRenderer.removeListener('mcp:status-changed', handler);
+    }
   }
 });
 
