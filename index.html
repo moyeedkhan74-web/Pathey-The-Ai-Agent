@@ -890,11 +890,15 @@
         <option value="mistral">Mistral AI</option>
       </select>
     </div>
+    <div id="mcp-status-badge" class="glass-badge" style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;background:rgba(15,23,42,0.6);border:1px solid var(--glass-border);backdrop-filter:blur(14px);">
+      <span id="mcp-dot" class="dot-status" style="width:8px;height:8px;border-radius:50%;background:var(--red);transition:all 0.3s ease;"></span>
+      <span id="mcp-status-text" style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:0.5px;text-transform:uppercase;color:var(--text-dim);">MCP: DISCONNECTED</span>
+    </div>
     <button class="ctrl-btn" id="mute-btn" title="Toggle voice mute">MUTE</button>
     <button class="ctrl-btn" id="reset-btn" title="Clear session history">RESET</button>
-    <button class="win-btn" id="min-btn" title="Minimize">_</button>
-    <button class="win-btn" id="fs-btn" title="Toggle Fullscreen"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.3" style="display:inline-block;vertical-align:middle;"><rect x="1" y="1" width="8" height="8" rx="0.5"/></svg></button>
-    <button class="win-btn close-btn" id="close-btn" title="Close">X</button>
+    <button class="win-btn" id="min-btn" title="Minimize"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    <button class="win-btn" id="fs-btn" title="Toggle Fullscreen"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M9 3v18M15 3v18"/></svg></button>
+    <button class="win-btn close-btn" id="close-btn" title="Close"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
 
   <div class="panel-show-bar" id="memory-show" title="Show Memory panel">M</div>
@@ -908,8 +912,8 @@
     <div class="panel-title">
       <span>Long-term Memory</span>
       <div class="panel-controls">
-        <button class="panel-ctrl-btn collapse-btn" title="Collapse">▲</button>
-        <button class="panel-ctrl-btn hide-btn" title="Hide panel">x</button>
+        <button class="panel-ctrl-btn collapse-btn" title="Collapse"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button>
+        <button class="panel-ctrl-btn hide-btn" title="Hide panel"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
     </div>
     <div class="rag-search-container">
@@ -925,8 +929,8 @@
     <div class="panel-title">
       <span>Active Plan</span>
       <div class="panel-controls">
-        <button class="panel-ctrl-btn collapse-btn" title="Collapse">▲</button>
-        <button class="panel-ctrl-btn hide-btn" title="Hide panel">x</button>
+        <button class="panel-ctrl-btn collapse-btn" title="Collapse"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button>
+        <button class="panel-ctrl-btn hide-btn" title="Hide panel"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
     </div>
     <div id="tasks-list"></div>
@@ -936,8 +940,8 @@
     <div class="panel-title">
       <span>Research</span>
       <div class="panel-controls">
-        <button class="panel-ctrl-btn collapse-btn" title="Collapse">▲</button>
-        <button class="panel-ctrl-btn hide-btn" title="Hide panel">x</button>
+        <button class="panel-ctrl-btn collapse-btn" title="Collapse"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button>
+        <button class="panel-ctrl-btn hide-btn" title="Hide panel"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
     </div>
     <div id="research-content"></div>
@@ -947,8 +951,8 @@
     <div class="panel-title">
       <span>Conversation</span>
       <div class="panel-controls">
-        <button class="panel-ctrl-btn collapse-btn" title="Collapse">▲</button>
-        <button class="panel-ctrl-btn hide-btn" title="Hide panel">x</button>
+        <button class="panel-ctrl-btn collapse-btn" title="Collapse"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button>
+        <button class="panel-ctrl-btn hide-btn" title="Hide panel"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
     </div>
     <div id="chat-history">
@@ -960,12 +964,18 @@
     <div class="panel-title">
       <span>Plugins</span>
       <div class="panel-controls">
-        <button class="panel-ctrl-btn collapse-btn" title="Collapse">▲</button>
-        <button class="panel-ctrl-btn hide-btn" title="Hide panel">x</button>
+        <button class="panel-ctrl-btn collapse-btn" title="Collapse"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button>
+        <button class="panel-ctrl-btn hide-btn" title="Hide panel"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
     </div>
     <div id="plugins-list">
       <div class="loading-state">Loading plugins...</div>
+    </div>
+    <div id="mcp-servers-section" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--glass-border);">
+      <div style="font-family:'Sora',sans-serif;font-size:11px;font-weight:600;color:var(--cyan);margin-bottom:8px;">MCP SERVERS</div>
+      <div id="mcp-servers-list">
+        <div class="loading-state">Loading MCP servers...</div>
+      </div>
     </div>
   </div>
 
@@ -973,8 +983,8 @@
     <div class="panel-title">
       <span>Activity Log</span>
       <div class="panel-controls">
-        <button class="panel-ctrl-btn collapse-btn" title="Collapse">▲</button>
-        <button class="panel-ctrl-btn hide-btn" title="Hide panel">x</button>
+        <button class="panel-ctrl-btn collapse-btn" title="Collapse"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg></button>
+        <button class="panel-ctrl-btn hide-btn" title="Hide panel"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
     </div>
     <div id="audit-list">
@@ -3052,22 +3062,17 @@ window.addEventListener('DOMContentLoaded', () => {
       bctx.globalAlpha = 1;
     }
 
-    if (el < 1800) {
-      requestAnimationFrame(drawBoot);
-    } else {
+    // Animation completes when final wave fully fades out (after ~5.5s)
+    if (finalWaveAlpha <= 0 && el > 5500) {
       settleIntoHUD();
+    } else {
+      requestAnimationFrame(drawBoot);
     }
   }
   requestAnimationFrame(drawBoot);
 
-  // Safety hard timeout: guarantee black screen disappears within 2 seconds
-  const bootSafetyTimer = setTimeout(() => {
-    settleIntoHUD();
-  }, 2200);
-
   // Allow clicking anywhere to skip boot screen immediately
   bootCanvas.addEventListener('click', () => {
-    clearTimeout(bootSafetyTimer);
     settleIntoHUD();
   });
 
@@ -3088,17 +3093,14 @@ window.addEventListener('DOMContentLoaded', () => {
   function settleIntoHUD() {
     if (settled) return;
     settled = true;
-    clearTimeout(bootSafetyTimer);
     bootCanvas.classList.add('fade-out');
     setTimeout(() => {
       bootCanvas.style.display = 'none';
       bootBrandEl.style.display = 'none';
       bootSubEl.style.display = 'none';
-    }, 300);
-
-    setTimeout(() => {
+      // Trigger welcome audio ONLY after boot screen fully fades out
       speakBootLine("Assalam u alaikum Khan sahab, I'm pathey_ AI agent, system initialized at your service.", 'online');
-    }, 50);
+    }, 300);
   }
   })();
   </script>
@@ -3108,8 +3110,8 @@ window.addEventListener('DOMContentLoaded', () => {
       <div class="confirm-title">Confirm Action</div>
       <div class="confirm-body" id="confirm-message"></div>
       <div class="confirm-actions">
-        <button class="confirm-btn danger" id="confirm-deny">Deny</button>
-        <button class="confirm-btn safe" id="confirm-allow">Allow</button>
+        <button class="confirm-btn danger" id="confirm-deny"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block;vertical-align:middle;margin-right:6px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Deny</button>
+        <button class="confirm-btn safe" id="confirm-allow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block;vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg>Allow</button>
       </div>
     </div>
   </div>

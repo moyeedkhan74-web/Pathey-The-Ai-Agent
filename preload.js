@@ -51,6 +51,13 @@ contextBridge.exposeInMainWorld('api', {
   togglePlugin: (pluginId) => ipcRenderer.invoke('toggle-plugin', pluginId),
   searchRagMemory: (query, limit) => ipcRenderer.invoke('search-rag-memory', { query, limit }),
   getAuditLog: (limit) => ipcRenderer.invoke('get-audit-log', { limit }),
+  mcpGetStatus: () => ipcRenderer.invoke('mcp:get-status'),
+  mcpGetServers: () => ipcRenderer.invoke('mcp:get-servers'),
+  mcpConnect: (config) => ipcRenderer.invoke('mcp:connect', config),
+  mcpDisconnect: (name) => ipcRenderer.invoke('mcp:disconnect', name),
+  mcpAddServer: (config) => ipcRenderer.invoke('mcp:add-server', config),
+  mcpRemoveServer: (name) => ipcRenderer.invoke('mcp:remove-server', name),
+  mcpToggleServer: (name, enabled) => ipcRenderer.invoke('mcp:toggle-server', name, enabled),
   onTtsAudioEnded: (callback) => {
     ttsAudioEndedCallbacks.push(callback);
     return () => {
@@ -77,6 +84,15 @@ contextBridge.exposeInMainWorld('pathey', {
   },
   audit: {
     getLog: (limit) => ipcRenderer.invoke('get-audit-log', { limit })
+  },
+  mcp: {
+    getStatus: () => ipcRenderer.invoke('mcp:get-status'),
+    getServers: () => ipcRenderer.invoke('mcp:get-servers'),
+    connect: (config) => ipcRenderer.invoke('mcp:connect', config),
+    disconnect: (name) => ipcRenderer.invoke('mcp:disconnect', name),
+    addServer: (config) => ipcRenderer.invoke('mcp:add-server', config),
+    removeServer: (name) => ipcRenderer.invoke('mcp:remove-server', name),
+    toggleServer: (name, enabled) => ipcRenderer.invoke('mcp:toggle-server', name, enabled)
   }
 });
 

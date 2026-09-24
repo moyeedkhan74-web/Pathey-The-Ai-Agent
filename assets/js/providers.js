@@ -14,6 +14,16 @@
     }
   }
 
+  async function updateMcpStatus() {
+    if (!window.pathey || !window.pathey.mcp) return;
+    try {
+      const status = await window.pathey.mcp.getStatus();
+      renderMcpStatus(status);
+    } catch (err) {
+      console.warn('[MCP] Failed to fetch status:', err.message);
+    }
+  }
+
   function renderProviderStatus(statusMap) {
     const dot = document.getElementById('provider-status-dot');
     const label = document.getElementById('provider-status-text');
@@ -37,6 +47,27 @@
         statusText += 'Offline';
     }
     label.textContent = statusText;
+    label.setAttribute('aria-live', 'polite');
+  }
+
+  function renderMcpStatus(status) {
+    const dot = document.getElementById('mcp-dot');
+    const label = document.getElementById('mcp-status-text');
+    if (!dot || !label) return;
+
+    const connected = status.connected || 0;
+    const total = status.total || 0;
+
+    if (connected > 0) {
+      dot.className = 'dot-status connected';
+      label.textContent = `MCP: ${connected}/${total} CONNECTED`;
+    } else if (status.servers && status.servers.some(s => s.connecting)) {
+      dot.className = 'dot-status connecting';
+      label.textContent = 'MCP: CONNECTING...';
+    } else {
+      dot.className = 'dot-status disconnected';
+      label.textContent = `MCP: DISCONNECTED (${total} configured)`;
+    }
     label.setAttribute('aria-live', 'polite');
   }
 
@@ -82,7 +113,9 @@
     }
 
     updateProviderHealth();
+    updateMcpStatus();
     setInterval(updateProviderHealth, 30000);
+    setInterval(updateMcpStatus, 10000);
   }
 
   if (document.readyState === 'loading') {

@@ -22,8 +22,8 @@ const TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
 const WSS_URL = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${TOKEN}`;
 
 const PRIMARY_VOICE = 'en-IN-PrabhatNeural';
-const PRIMARY_RATE = '+15%';
-const PRIMARY_PITCH = '+5Hz';
+const PRIMARY_RATE = '+0%';
+const PRIMARY_PITCH = '+0Hz';
 
 // ─── TLS bypass agent (avoids Windows CRL revocation delay) ──────────────
 const FAST_AGENT = new https.Agent({
@@ -328,7 +328,7 @@ function speakPowerShellFallback(cleanText, mainWindow, sessionId) {
 Add-Type -AssemblyName System.Speech;
 $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer;
 $synth.SelectVoiceByHints([System.Speech.Synthesis.VoiceGender]::Male);
-$synth.Rate = 2;
+$synth.Rate = 0;
 $synth.Volume = 100;
 $synth.SetOutputToWaveFile('${wavFile.replace(/\\/g, '\\\\')}');
 $synth.Speak("${safeTxt}");

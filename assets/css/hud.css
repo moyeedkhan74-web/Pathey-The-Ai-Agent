@@ -165,3 +165,172 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── MCP Status Badge ── */
+#mcp-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.dot-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.dot-status.connected {
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green), 0 0 20px var(--green);
+}
+
+.dot-status.connecting {
+  background: #ffaa00;
+  box-shadow: 0 0 10px #ffaa00, 0 0 20px #ffaa00;
+  animation: pulseDot 1s infinite alternate;
+}
+
+.dot-status.disconnected {
+  background: var(--red);
+  box-shadow: 0 0 8px var(--red);
+}
+
+/* ── SVG Icon Hover Effects ── */
+.win-btn:hover svg,
+.ctrl-btn:hover svg,
+.panel-ctrl-btn:hover svg,
+.confirm-btn:hover svg {
+  stroke: var(--cyan);
+  filter: drop-shadow(0 0 4px var(--cyan));
+}
+
+.close-btn:hover svg,
+.panel-ctrl-btn.hide-btn:hover svg,
+.confirm-btn.danger:hover svg {
+  stroke: var(--red);
+  filter: drop-shadow(0 0 4px var(--red));
+}
+
+.confirm-btn.safe:hover svg {
+  stroke: var(--green);
+  filter: drop-shadow(0 0 4px var(--green));
+}
+
+/* Task status indicators */
+.task-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.task-status.done {
+  background: rgba(61, 255, 160, 0.15);
+  border: 1px solid rgba(61, 255, 160, 0.3);
+}
+
+.task-status.done svg {
+  stroke: var(--green);
+}
+
+.task-status.error {
+  background: rgba(255, 90, 106, 0.15);
+  border: 1px solid rgba(255, 90, 106, 0.3);
+}
+
+.task-status.error svg {
+  stroke: var(--red);
+}
+
+.task-status.pending {
+  background: rgba(255, 183, 77, 0.15);
+  border: 1px solid rgba(255, 183, 77, 0.3);
+}
+
+.task-status.pending svg {
+  stroke: #ffb74d;
+}
+
+/* MCP Server list items */
+.mcp-server-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.mcp-server-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mcp-server-name {
+  color: var(--cyan);
+  font-weight: 500;
+}
+
+.mcp-server-transport {
+  color: var(--text-dim);
+  font-size: 8.5px;
+}
+
+.mcp-server-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.mcp-server-status.connected { color: var(--green); }
+.mcp-server-status.connecting { color: #ffaa00; }
+.mcp-server-status.disconnected { color: var(--red); }
+
+.mcp-toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.mcp-toggle.active {
+  background: var(--cyan);
+}
+
+.mcp-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.mcp-toggle.active::after {
+  transform: translateX(16px);
+}

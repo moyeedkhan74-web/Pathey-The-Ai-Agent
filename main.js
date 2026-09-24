@@ -16,6 +16,7 @@ const { saveMemory, logActivity, appendMemory, readMemory, getMemoryContext, ext
 const { extractToolCall, normalizeUrl, shouldStopAfterToolCall, isYouTubeWatchUrl, isGenericYouTubeUrl, extractYouTubeVideoIdFromHtml, extractYouTubeVideoIdsFromHtml, searchYouTubeVideos, scoreYouTubeCandidate, extractQuotedPhrases, isYouTubeVideoUnavailableHtml, isResearchRequest } = require('./browser_utils');
 const { executeTool: registryExecuteTool, getAvailableToolsList, getAllToolSchemas, registerPluginTools, unregisterPluginTools, isDangerous } = require('./tools/registry');
 const { loadPlugins } = require('./plugins');
+const { initializeMcpServers, connectMcpServer, disconnectMcpServer, getMcpServers, getMcpStatus, addMcpServer, removeMcpServer } = require('./mcp');
 let mainWindow = null;
 let serverProcess = null;
 let voiceCaptureProcess = null;
@@ -1052,6 +1053,13 @@ app.whenReady().then(async () => {
     console.warn('[Pathey] Knowledge indexing failed:', err.message);
   }
 
+  // Initialize MCP servers
+  try {
+    await initializeMcpServers();
+  } catch (err) {
+    console.warn('[Pathey] MCP initialization failed:', err.message);
+  }
+
   createWindow();
 });
 app.on('window-all-closed', () => {
@@ -1260,10 +1268,87 @@ ipcMain.handle('get-audit-log', async (_event, { limit }) => {
         details,
         status: 'completed'
       };
-    });
+});
     return sanitized;
   } catch (err) {
     console.warn('[Pathey HUD] get-audit-log failed:', err.message);
     return [];
+  }
+});
+
+ipcMain.handle('mcp:get-status', async () => {
+  try {
+    const { getMcpStatus } = require('./mcp');
+    return getMcpStatus();
+  } catch (err) {
+    console.warn('[MCP] get-status failed:', err.message);
+    return { connected: 0, total: 0, servers: [] };
+  }
+});
+
+ipcMain.handle('mcp:get-servers', async () => {
+  try {
+    const { getMcpServers } = require('./mcp');
+    return getMcpServers();
+  } catch (err) {
+    console.warn('[MCP] get-servers failed:', err.message);
+    return [];
+  }
+});
+
+ipcMain.handle('mcp:connect', async (_event, serverConfig) => {
+  try {
+    const { connectMcpServer } = require('./mcp');
+    return await connectMcpServer(serverConfig);
+  } catch (err) {
+    console.warn('[MCP] connect failed:', err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mcp:disconnect', async (_event, name) => {
+  try {
+    const { disconnectMcpServer } = require('./mcp');
+    return await disconnectMcpServer(name);
+  } catch (err) {
+    console.warn('[MCP] disconnect failed:', err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mcp:add-server', async (_event, serverConfig) => {
+  try {
+    const { addMcpServer } = require('./mcp');
+    return addMcpServer(serverConfig);
+  } catch (err) {
+    console.warn('[MCP] add-server failed:', err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mcp:remove-server', async (_event, name) => {
+  try {
+    const { removeMcpServer } = require('./mcp');
+    return removeMcpServer(name);
+  } catch (err) {
+    console.warn('[MCP] remove-server failed:', err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mcp:toggle-server', async (_event, name, enabled) => {
+  try {
+    const { getMcpServers, connectMcpServer, disconnectMcpServer } = require('./mcp');
+    const servers = getMcpServers();
+    const server = servers.find(s => s.name === name);
+    if (!server) return { ok: false, error: 'Server not found' };
+    if (enabled) {
+      return await connectMcpServer(server);
+    } else {
+      return await disconnectMcpServer(name);
+    }
+  } catch (err) {
+    console.warn('[MCP] toggle-server failed:', err.message);
+    return { ok: false, error: err.message };
   }
 });
