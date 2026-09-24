@@ -382,10 +382,15 @@ class McpClient {
 const mcpClients = new Map();
 
 async function connectMcpServer(serverConfig) {
-  if (mcpClients.has(serverConfig.name)) {
-    return { ok: false, error: 'Server already connected' };
+  let client = mcpClients.get(serverConfig.name);
+  if (client && client.connected) {
+    return { ok: true, message: 'Server already connected' };
   }
-  const client = new McpClient(serverConfig);
+  if (client) {
+    try { await client.disconnect(); } catch (_) {}
+    mcpClients.delete(serverConfig.name);
+  }
+  client = new McpClient(serverConfig);
   mcpClients.set(serverConfig.name, client);
   const result = await client.connect();
   if (result.ok) {
@@ -393,6 +398,8 @@ async function connectMcpServer(serverConfig) {
     const { registerPluginTools } = require('./tools/registry');
     const tools = client.getTools();
     registerPluginTools(Object.fromEntries(tools.map(t => [t.name, t])));
+  } else {
+    mcpClients.delete(serverConfig.name);
   }
   return result;
 }

@@ -1350,26 +1350,30 @@ ipcMain.handle('mcp:add-server', async (_event, serverConfig) => {
   }
 });
 
-ipcMain.handle('mcp:remove-server', async (_event, name) => {
+ipcMain.handle('mcp:remove-server', async (_event, nameOrId) => {
   try {
-    const { removeMcpServer } = require('./mcp');
-    return removeMcpServer(name);
+    const { removeMcpServer, getMcpServers, disconnectMcpServer } = require('./mcp');
+    const servers = getMcpServers();
+    const target = servers.find(s => s.id === nameOrId || s.name === nameOrId);
+    const targetName = target ? target.name : nameOrId;
+    await disconnectMcpServer(targetName);
+    return removeMcpServer(targetName);
   } catch (err) {
     console.warn('[MCP] remove-server failed:', err.message);
     return { ok: false, error: err.message };
   }
 });
 
-ipcMain.handle('mcp:toggle-server', async (_event, name, enabled) => {
+ipcMain.handle('mcp:toggle-server', async (_event, nameOrId, enabled) => {
   try {
     const { getMcpServers, connectMcpServer, disconnectMcpServer } = require('./mcp');
     const servers = getMcpServers();
-    const server = servers.find(s => s.name === name);
+    const server = servers.find(s => s.id === nameOrId || s.name === nameOrId);
     if (!server) return { ok: false, error: 'Server not found' };
     if (enabled) {
       return await connectMcpServer(server);
     } else {
-      return await disconnectMcpServer(name);
+      return await disconnectMcpServer(server.name);
     }
   } catch (err) {
     console.warn('[MCP] toggle-server failed:', err.message);
