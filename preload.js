@@ -56,8 +56,10 @@ contextBridge.exposeInMainWorld('api', {
   mcpConnect: (config) => ipcRenderer.invoke('mcp:connect', config),
   mcpDisconnect: (name) => ipcRenderer.invoke('mcp:disconnect', name),
   mcpAddServer: (config) => ipcRenderer.invoke('mcp:add-server', config),
+  mcpUpdateServer: (name, config) => ipcRenderer.invoke('mcp:update-server', name, config),
   mcpRemoveServer: (name) => ipcRenderer.invoke('mcp:remove-server', name),
   mcpToggleServer: (name, enabled) => ipcRenderer.invoke('mcp:toggle-server', name, enabled),
+  mcpAddPreset: (presetName) => ipcRenderer.invoke('mcp:add-preset', presetName),
   onTtsAudioEnded: (callback) => {
     ttsAudioEndedCallbacks.push(callback);
     return () => {
@@ -91,8 +93,10 @@ contextBridge.exposeInMainWorld('pathey', {
     connect: (config) => ipcRenderer.invoke('mcp:connect', config),
     disconnect: (name) => ipcRenderer.invoke('mcp:disconnect', name),
     addServer: (config) => ipcRenderer.invoke('mcp:add-server', config),
+    updateServer: (name, config) => ipcRenderer.invoke('mcp:update-server', name, config),
     removeServer: (name) => ipcRenderer.invoke('mcp:remove-server', name),
-    toggleServer: (name, enabled) => ipcRenderer.invoke('mcp:toggle-server', name, enabled)
+    toggleServer: (name, enabled) => ipcRenderer.invoke('mcp:toggle-server', name, enabled),
+    addPreset: (presetName) => ipcRenderer.invoke('mcp:add-preset', presetName)
   }
 });
 

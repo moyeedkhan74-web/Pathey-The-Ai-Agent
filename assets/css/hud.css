@@ -334,3 +334,330 @@
 .mcp-toggle.active::after {
   transform: translateX(16px);
 }
+
+/* ── MCP Modal ── */
+.mcp-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.mcp-modal {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 20px;
+  width: 420px;
+  max-width: 90vw;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.mcp-modal-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.mcp-modal-title span {
+  font-family: 'Sora', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cyan);
+}
+
+.mcp-modal-close {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.mcp-modal-close:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.mcp-form-group {
+  margin-bottom: 14px;
+}
+
+.mcp-form-group label {
+  display: block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.mcp-form-group input,
+.mcp-form-group select {
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  outline: none;
+  transition: border-color 0.25s ease;
+}
+
+.mcp-form-group input:focus,
+.mcp-form-group select:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px rgba(90, 215, 255, 0.15);
+}
+
+.mcp-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.mcp-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--glass-border);
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
+}
+
+.mcp-btn-secondary {
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.mcp-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+.mcp-btn-primary {
+  background: rgba(90, 215, 255, 0.15);
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.mcp-btn-primary:hover {
+  background: rgba(90, 215, 255, 0.3);
+  box-shadow: 0 0 12px var(--cyan);
+}
+
+/* MCP Action header in plugins panel */
+.mcp-action-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.mcp-section-title {
+  font-family: 'Sora', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cyan);
+}
+
+.mcp-badge {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+}
+
+.mcp-action-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.mcp-btn-small {
+  padding: 4px 10px;
+  font-size: 9px;
+  border-radius: 16px;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-dim);
+  backdrop-filter: blur(10px);
+}
+
+.mcp-btn-small:hover {
+  background: rgba(90, 215, 255, 0.1);
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.mcp-presets-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.mcp-presets-list {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 4px;
+  min-width: 160px;
+  z-index: 100;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.mcp-presets-dropdown:hover .mcp-presets-list {
+  display: block;
+}
+
+.mcp-preset-chip {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  background: transparent;
+}
+
+.mcp-preset-chip:hover {
+  background: rgba(90, 215, 255, 0.1);
+  color: var(--cyan);
+}
+
+/* MCP Tools Accordion */
+.mcp-tools-accordion {
+  margin-top: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--glass-border);
+}
+
+.mcp-tools-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.mcp-tools-header:hover {
+  color: var(--cyan);
+}
+
+.mcp-tools-list {
+  margin-top: 6px;
+  display: none;
+}
+
+.mcp-tools-list.visible {
+  display: block;
+}
+
+.mcp-tool-item {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.mcp-tool-item-name {
+  color: var(--cyan);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.mcp-tool-item-desc {
+  color: var(--text-dim);
+}
+
+.mcp-server-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.mcp-action-btn {
+  width: 24px;
+  height: 20px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.mcp-action-btn:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.mcp-action-btn.delete:hover {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

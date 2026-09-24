@@ -1276,6 +1276,26 @@ ipcMain.handle('get-audit-log', async (_event, { limit }) => {
   }
 });
 
+function validateMcpServerConfig(config) {
+  if (!config || typeof config !== 'object') return { valid: false, error: 'Invalid config object' };
+  if (typeof config.name !== 'string' || config.name.trim().length < 1 || config.name.trim().length > 64) {
+    return { valid: false, error: 'Server name must be 1-64 characters' };
+  }
+  if (!['stdio', 'sse'].includes(config.transport)) {
+    return { valid: false, error: 'Transport must be "stdio" or "sse"' };
+  }
+  if (typeof config.command !== 'string' || config.command.trim().length < 1) {
+    return { valid: false, error: 'Command is required' };
+  }
+  if (config.args !== undefined && !Array.isArray(config.args)) {
+    return { valid: false, error: 'Args must be an array' };
+  }
+  if (config.env !== undefined && (typeof config.env !== 'object' || Array.isArray(config.env))) {
+    return { valid: false, error: 'Env must be an object' };
+  }
+  return { valid: true };
+}
+
 ipcMain.handle('mcp:get-status', async () => {
   try {
     const { getMcpStatus } = require('./mcp');
@@ -1298,6 +1318,8 @@ ipcMain.handle('mcp:get-servers', async () => {
 
 ipcMain.handle('mcp:connect', async (_event, serverConfig) => {
   try {
+    const validation = validateMcpServerConfig(serverConfig);
+    if (!validation.valid) return { ok: false, error: validation.error };
     const { connectMcpServer } = require('./mcp');
     return await connectMcpServer(serverConfig);
   } catch (err) {
@@ -1318,6 +1340,8 @@ ipcMain.handle('mcp:disconnect', async (_event, name) => {
 
 ipcMain.handle('mcp:add-server', async (_event, serverConfig) => {
   try {
+    const validation = validateMcpServerConfig(serverConfig);
+    if (!validation.valid) return { ok: false, error: validation.error };
     const { addMcpServer } = require('./mcp');
     return addMcpServer(serverConfig);
   } catch (err) {
@@ -1349,6 +1373,38 @@ ipcMain.handle('mcp:toggle-server', async (_event, name, enabled) => {
     }
   } catch (err) {
     console.warn('[MCP] toggle-server failed:', err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mcp:update-server', async (_event, name, serverConfig) => {
+  try {
+    const validation = validateMcpServerConfig({ ...serverConfig, name });
+    if (!validation.valid) return { ok: false, error: validation.error };
+    const { updateMcpServer, getMcpServers, disconnectMcpServer, connectMcpServer } = require('./mcp');
+    const servers = getMcpServers();
+    const server = servers.find(s => s.name === name);
+    if (server && server.connected) {
+      await disconnectMcpServer(name);
+    }
+    const result = updateMcpServer(name, serverConfig);
+    if (result.ok && (serverConfig.autoConnect || (server && server.connected))) {
+      const updatedServer = { ...serverConfig, name, ...(server ? { enabled: server.enabled } : {}) };
+      await connectMcpServer(updatedServer);
+    }
+    return result;
+  } catch (err) {
+    console.warn('[MCP] update-server failed:', err.message);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('mcp:add-preset', async (_event, presetName) => {
+  try {
+    const { addDefaultPreset } = require('./mcp');
+    return addDefaultPreset(presetName);
+  } catch (err) {
+    console.warn('[MCP] add-preset failed:', err.message);
     return { ok: false, error: err.message };
   }
 });

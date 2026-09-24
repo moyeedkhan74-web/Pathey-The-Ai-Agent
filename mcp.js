@@ -11,6 +11,48 @@ const os = require('os');
 const MCP_CONFIG_FILE = path.join(os.homedir(), '.pathey', 'mcp_servers.json');
 const MCP_BASE_DIR = path.join(os.homedir(), '.pathey', 'mcp');
 
+const DEFAULT_PRESETS = [
+  {
+    name: 'Filesystem',
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-filesystem', '.'],
+    enabled: false
+  },
+  {
+    name: 'Fetch & Web',
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-fetch'],
+    enabled: false
+  },
+  {
+    name: 'Memory Graph',
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-memory'],
+    enabled: false
+  },
+  {
+    name: 'SQLite',
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-sqlite', '--db-path', './data.db'],
+    enabled: false
+  },
+  {
+    name: 'GitHub',
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-github'],
+    enabled: false
+  }
+];
+
+function getDefaultPresets() {
+  return DEFAULT_PRESETS.map(p => ({ ...p }));
+}
+
 function ensureMcpDirs() {
   try {
     fs.mkdirSync(MCP_BASE_DIR, { recursive: true });
@@ -23,10 +65,17 @@ function loadMcpConfig() {
   ensureMcpDirs();
   try {
     if (fs.existsSync(MCP_CONFIG_FILE)) {
-      return JSON.parse(fs.readFileSync(MCP_CONFIG_FILE, 'utf8'));
+      const config = JSON.parse(fs.readFileSync(MCP_CONFIG_FILE, 'utf8'));
+      if (!config.servers || config.servers.length === 0) {
+        config.servers = getDefaultPresets();
+        saveMcpConfig(config);
+      }
+      return config;
     }
   } catch (_) {}
-  return { servers: [] };
+  const defaultConfig = { servers: getDefaultPresets() };
+  saveMcpConfig(defaultConfig);
+  return defaultConfig;
 }
 
 function saveMcpConfig(config) {
@@ -36,6 +85,20 @@ function saveMcpConfig(config) {
   } catch (err) {
     console.warn('[MCP] Failed to save config:', err.message);
   }
+}
+
+function getDefaultPreset(name) {
+  return DEFAULT_PRESETS.find(p => p.name.toLowerCase() === name.toLowerCase());
+}
+
+function addDefaultPreset(presetName) {
+  const config = loadMcpConfig();
+  const preset = getDefaultPreset(presetName);
+  if (!preset) return { ok: false, error: 'Unknown preset: ' + presetName };
+  if (config.servers.some(s => s.name === preset.name)) return { ok: false, error: 'Server already exists' };
+  config.servers.push({ ...preset });
+  saveMcpConfig(config);
+  return { ok: true, server: preset };
 }
 
 class McpClient {
@@ -156,6 +219,8 @@ class McpClient {
           reject(new Error(`SSE connection failed: ${res.statusCode}`));
           return;
         }
+        // Assign the response stream so the readiness check resolves
+        this.sseConnection = res;
         let buffer = '';
         res.on('data', (chunk) => {
           buffer += chunk;
@@ -167,6 +232,7 @@ class McpClient {
         });
         res.on('end', () => {
           this.connected = false;
+          this.sseConnection = null;
         });
       });
       req.on('error', (err) => reject(err));
@@ -342,20 +408,36 @@ async function disconnectMcpServer(name) {
   return { ok: true };
 }
 
+function sanitizeServerForRenderer(server) {
+  // Never expose raw environment variables to the renderer process
+  const { env, ...rest } = server;
+  return { ...rest, hasEnv: !!env && Object.keys(env).length > 0 };
+}
+
 function getMcpServers() {
   const config = loadMcpConfig();
-  return config.servers.map(s => ({
-    ...s,
-    status: mcpClients.has(s.name) ? mcpClients.get(s.name).getStatus() : { ...s, connected: false }
-  }));
+  return config.servers.map(s => {
+    const client = mcpClients.get(s.name);
+    const status = client ? client.getStatus() : { ...s, connected: false, connecting: false, toolsCount: 0 };
+    return {
+      ...sanitizeServerForRenderer(s),
+      ...status,
+      tools: status.toolsCount > 0 && client ? client.tools.map(t => ({
+        name: t.name,
+        description: t.description || '',
+        inputSchema: t.inputSchema || {}
+      })) : []
+    };
+  });
 }
 
 function getMcpStatus() {
+  const config = loadMcpConfig();
   const servers = [];
   for (const [name, client] of mcpClients) {
     servers.push(client.getStatus());
   }
-  return { connected: servers.filter(s => s.connected).length, total: servers.length, servers };
+  return { connected: servers.filter(s => s.connected).length, total: config.servers.length, servers };
 }
 
 function addMcpServer(serverConfig) {
@@ -364,6 +446,15 @@ function addMcpServer(serverConfig) {
     return { ok: false, error: 'Server name already exists' };
   }
   config.servers.push(serverConfig);
+  saveMcpConfig(config);
+  return { ok: true };
+}
+
+function updateMcpServer(name, serverConfig) {
+  const config = loadMcpConfig();
+  const idx = config.servers.findIndex(s => s.name === name);
+  if (idx === -1) return { ok: false, error: 'Server not found' };
+  config.servers[idx] = { ...config.servers[idx], ...serverConfig, name };
   saveMcpConfig(config);
   return { ok: true };
 }
@@ -390,7 +481,11 @@ module.exports = {
   getMcpServers,
   getMcpStatus,
   addMcpServer,
+  updateMcpServer,
   removeMcpServer,
+  addDefaultPreset,
+  getDefaultPreset,
+  getDefaultPresets,
   initializeMcpServers,
   McpClient
 };
