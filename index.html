@@ -1333,11 +1333,21 @@
     const parseEnv = s => Object.fromEntries(s.split(',').map(x => x.trim()).filter(x => x.includes('=')).map(x => { const i = x.indexOf('='); return [x.slice(0, i).trim(), x.slice(i + 1).trim()] }));
     async function loadMcp() { const r = await call(P.mcp?.list); servers = Array.isArray(r) ? r : []; renderMcp() }
     function renderMcp() {
-      const live = servers.filter(s => s.status === 'connected'), cnt = live.reduce((a, s) => a + (s.tools?.length || 0), 0);
-      $('mcp-count').textContent = servers.length + (servers.length === 1 ? ' server' : ' servers'); $('mcp-dot').className = 'sd ' + (live.length ? 'connected' : servers.some(s => s.status === 'connecting') ? 'connecting' : '');
-      $('mcp-status-text').textContent = live.length ? `MCP: CONNECTED (${cnt})` : 'MCP: DISCONNECTED'; $('mcp-status-text').style.color = live.length ? 'var(--green)' : '';
+      const live = servers.filter(s => s.connected || s.status === 'connected');
+      const cnt = live.reduce((a, s) => a + (s.tools?.length || 0), 0);
+      $('mcp-count').textContent = servers.length + (servers.length === 1 ? ' server' : ' servers');
+      $('mcp-dot').className = 'sd ' + (live.length ? 'connected' : servers.some(s => s.connecting || s.status === 'connecting') ? 'connecting' : '');
+      $('mcp-status-text').textContent = live.length ? `MCP: ${live.length}/${servers.length} CONNECTED (${cnt} TOOLS)` : 'MCP: DISCONNECTED';
+      $('mcp-status-text').style.color = live.length ? 'var(--green)' : '';
       const open = new Set([...document.querySelectorAll('#mcp-servers-list .card.open')].map(c => c.dataset.id));
-      $('mcp-servers-list').innerHTML = servers.length ? servers.map(s => { const st = s.status || 'disconnected', tl = s.tools || []; return `<div class="card ${open.has(s.id) ? 'open' : ''}" data-id="${esc(s.id)}"><div class="row"><span class="sd ${st}"></span><span class="n">${esc(s.name)}</span><span class="tag">${esc(s.transport || 'stdio')}</span><span class="sp"></span><label class="sw" title="Connect / disconnect"><input type="checkbox" data-a="t" ${st === 'connected' || st === 'connecting' ? 'checked' : ''}><i></i></label><button class="ic" data-a="e" title="Edit">${I.edit}</button><button class="ic dn" data-a="d" title="Delete">${I.trash}</button></div><button class="btn acc" data-a="o">Tools (${tl.length}) ${I.chev.replace('class="cv"', '')}</button><div class="tools">${tl.length ? tl.map(t => `<div><b>${esc(t.name)}</b> ${esc(t.description || '')}</div>`).join('') : '<div>No tools — connect the server to load them.</div>'}</div></div>` }).join('') : '<div class="empty">No MCP servers yet. Use Presets or Add server.</div>'
+      $('mcp-servers-list').innerHTML = servers.length ? servers.map(s => {
+        const isConn = s.connected || s.status === 'connected';
+        const isConnG = s.connecting || s.status === 'connecting';
+        const st = isConn ? 'connected' : isConnG ? 'connecting' : 'disconnected';
+        const tl = s.tools || [];
+        const cardGlow = isConn ? 'style="border-color: rgba(61,255,160,.4); background: rgba(61,255,160,.03);"' : '';
+        return `<div class="card ${open.has(s.id) ? 'open' : ''}" data-id="${esc(s.id)}" ${cardGlow}><div class="row"><span class="sd ${st}"></span><span class="n" style="${isConn ? 'color:var(--green);font-weight:600;' : ''}">${esc(s.name)}</span><span class="tag ${isConn ? 'SAFE' : ''}">${esc(s.transport || 'stdio')}</span><span class="sp"></span><label class="sw" title="Connect / disconnect"><input type="checkbox" data-a="t" ${isConn || isConnG ? 'checked' : ''}><i></i></label><button class="ic" data-a="e" title="Edit">${I.edit}</button><button class="ic dn" data-a="d" title="Delete">${I.trash}</button></div><button class="btn acc" data-a="o" style="${isConn ? 'border-color:rgba(61,255,160,.3);' : ''}">Tools (${tl.length}) ${I.chev.replace('class="cv"', '')}</button><div class="tools">${tl.length ? tl.map(t => `<div><b>${esc(t.name)}</b> ${esc(t.description || '')}</div>`).join('') : '<div>No tools — connect the server to load them.</div>'}</div></div>`
+      }).join('') : '<div class="empty">No MCP servers yet. Use Presets or Add server.</div>'
     }
     $('mcp-servers-list').addEventListener('click', async e => {
       const a = e.target.closest('[data-a]'), c = e.target.closest('.card'); if (!a || !c) return; const id = c.dataset.id, s = servers.find(x => x.id === id);
